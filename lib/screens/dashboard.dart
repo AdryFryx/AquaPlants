@@ -23,8 +23,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _cargarDatos(); // Carga inicial
-    // Configuramos un temporizador para que pregunte a la API cada 5 segundos
+    _cargarDatos(); 
     _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
       _cargarDatos();
     });
@@ -77,12 +76,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: const Text('Mi Cultivo - Torre 1', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF00BFA5),
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          )
-        ],
+        actions: [ ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),

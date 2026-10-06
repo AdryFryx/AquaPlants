@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'screens/dashboard.dart';
 import 'services/api_service.dart';
+import 'screens/home.dart';
 void main() {
   runApp(const AquaPlantsApp());
 }
@@ -58,10 +58,10 @@ Future<void> _iniciarSesion() async {
 
     if (success) {
       // Login exitoso: Viajamos al Dashboard
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const DashboardScreen()),
-      );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
     } else {
       // Error: Mostramos alerta roja
       ScaffoldMessenger.of(context).showSnackBar(

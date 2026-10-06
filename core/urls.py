@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from api.views import DispositivoViewSet, MedicionViewSet
+from api.views import DispositivoViewSet, MedicionViewSet, actualizar_configuracion, gestionar_alertas
 
 # Enrutador automático para nuestra API
 router = DefaultRouter()
@@ -31,6 +31,8 @@ urlpatterns = [
     # Rutas mágicas de JWT (Las que usa Flutter para el Login)
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/configuracion/',actualizar_configuracion, name='actualizar_configuracion'),
+    path('api/alertas/', gestionar_alertas, name='gestionar_alertas'),
     
     # Rutas de nuestra API (Telemetría)
     path('api/', include(router.urls)),

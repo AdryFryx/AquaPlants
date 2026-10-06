@@ -70,4 +70,71 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('jwt_token');
   }
+
+  // Función para enviar la configuración a Django (CU2)
+  Future<bool> guardarConfiguracion(String tipoPlanta, String tempMax) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('jwt_token');
+
+      if (token == null) return false;
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/configuracion/'), // La ruta que acabamos de crear en Python
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'tipo_planta': tipoPlanta,
+          'temp_max': tempMax,
+        }),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error al guardar configuración: $e');
+      return false;
+    }
+  }
+
+  // Función para obtener la lista de alertas
+  Future<List<dynamic>> getAlertas() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('jwt_token');
+      if (token == null) return [];
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/alertas/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Función para marcar la alerta como leída/resuelta (Botón Verde)
+  Future<bool> resolverAlerta(int id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('jwt_token');
+      final response = await http.post(
+        Uri.parse('$baseUrl/alertas/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'id': id}), // Enviamos el ID de la alerta a borrar
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
 }
