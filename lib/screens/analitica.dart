@@ -1,7 +1,67 @@
 import 'package:flutter/material.dart';
+import 'package:aquaplants/services/api_service.dart';
 
-class AnaliticaScreen extends StatelessWidget {
+class AnaliticaScreen extends StatefulWidget {
   const AnaliticaScreen({super.key});
+
+  @override
+  State<AnaliticaScreen> createState() => _AnaliticaScreenState();
+}
+
+class _AnaliticaScreenState extends State<AnaliticaScreen> {
+  int _diasSeleccionados = 7; // Por defecto 1 semana
+  String _tituloPeriodo = 'Resumen Semanal';
+
+  // Función para abrir el menú de selección de fechas
+  void _mostrarFiltroFechas() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text('Filtrar Histórico', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              ListTile(
+                leading: const Icon(Icons.history_toggle_off),
+                title: const Text('Últimos 3 días'),
+                onTap: () => _aplicarFiltro(3, 'Resumen: Últimos 3 días'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.calendar_view_week),
+                title: const Text('Última semana'),
+                onTap: () => _aplicarFiltro(7, 'Resumen Semanal'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.calendar_month),
+                title: const Text('Último mes'),
+                onTap: () => _aplicarFiltro(30, 'Resumen Mensual'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _aplicarFiltro(int dias, String titulo) {
+    setState(() {
+      _diasSeleccionados = dias;
+      _tituloPeriodo = titulo;
+    });
+    Navigator.pop(context); // Cierra el modal
+    
+    
+    ApiService().getMediciones(dias: _diasSeleccionados).then((datos) {
+    setState(() {});
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -9,14 +69,12 @@ class AnaliticaScreen extends StatelessWidget {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Análisis Agronómico', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF1976D2), // Azul analítica
+        backgroundColor: const Color(0xFF1976D2),
         elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_month, color: Colors.white),
-            onPressed: () {
-              // Futuro selector de fechas
-            },
+            onPressed: _mostrarFiltroFechas, // Conectamos el botón al modal
           )
         ],
       ),
@@ -25,7 +83,8 @@ class AnaliticaScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Resumen Semanal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
+            // El texto ahora cambia dinámicamente según el filtro
+            Text(_tituloPeriodo, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -35,6 +94,8 @@ class AnaliticaScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
+            
+            // UI original restaurada completa
             const Text('Estabilidad del Sistema', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
             const SizedBox(height: 16),
             Container(
@@ -64,7 +125,7 @@ class AnaliticaScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

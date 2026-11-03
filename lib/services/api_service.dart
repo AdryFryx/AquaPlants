@@ -37,33 +37,38 @@ class ApiService {
     }
   }
 
-  Future<List<dynamic>> getMediciones() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt_token'); // Rescatamos el token guardado
+  Future<List<dynamic>> getMediciones({int? dias}) async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('jwt_token');
 
-      if (token == null) return []; // Si no hay token, no hacemos la petición
+        if (token == null) return [];
 
-      final response = await http.get(
-        Uri.parse('$baseUrl/mediciones/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token', // Mandamos la llave mágica de JWT
-        },
-      );
+        // Construimos la URL dinámica
+        String url = '$baseUrl/mediciones/';
+        if (dias != null) {
+          url += '?dias=$dias';
+        }
 
-      if (response.statusCode == 200) {
-        // Si sale bien, devolvemos la lista de datos
-        return jsonDecode(response.body); 
-      } else {
-        print('Error del servidor: ${response.statusCode}');
+        final response = await http.get(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          return jsonDecode(response.body); 
+        } else {
+          print('Error del servidor: ${response.statusCode}');
+          return [];
+        }
+      } catch (e) {
+        print('Error de red: $e');
         return [];
       }
-    } catch (e) {
-      print('Error de red: $e');
-      return [];
     }
-  }
 
   // Función para cerrar sesión (borrar el token)
   Future<void> logout() async {

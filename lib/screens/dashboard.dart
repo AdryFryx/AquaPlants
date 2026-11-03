@@ -109,7 +109,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
               ),
               child: historialAgua.isEmpty
                   ? const Center(child: CircularProgressIndicator())
@@ -130,7 +130,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             isStrokeCapRound: true,
                             belowBarData: BarAreaData(
                               show: true,
-                              color: const Color(0xFF00BFA5).withOpacity(0.2),
+                              color: const Color(0xFF00BFA5).withValues(alpha: 0.2),
                             ),
                           ),
                         ],
@@ -149,7 +149,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
         border: Border(bottom: BorderSide(color: statusColor, width: 4)),
       ),
       child: Column(

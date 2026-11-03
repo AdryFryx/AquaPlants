@@ -22,8 +22,8 @@ from api.views import DispositivoViewSet, MedicionViewSet, actualizar_configurac
 
 # Enrutador automático para nuestra API
 router = DefaultRouter()
-router.register(r'dispositivos', DispositivoViewSet)
-router.register(r'mediciones', MedicionViewSet)
+router.register(r'dispositivos', DispositivoViewSet,basename='dispositivo')
+router.register(r'mediciones', MedicionViewSet, basename='medicion')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

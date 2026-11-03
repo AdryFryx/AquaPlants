@@ -4,24 +4,58 @@ from .models import Dispositivo, Medicion, ReglaUmbral, Cultivo, AlertaGenerada
 from .serializers import DispositivoSerializer, MedicionSerializer
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from django.utils import timezone
+from datetime import timedelta
 
 class DispositivoViewSet(viewsets.ModelViewSet):
-    queryset = Dispositivo.objects.all()
     serializer_class = DispositivoSerializer
-    permission_classes = [IsAuthenticated] # Solo usuarios logueados con JWT pueden ver esto
+    permission_classes = [IsAuthenticated] 
+
+    def get_queryset(self):
+        usuario = self.request.user
+        
+        # 1. Administrador (Superusuario en Django): Ve todo el sistema
+        if usuario.is_superuser:
+            return Dispositivo.objects.all()
+            
+        # 2. Supervisor (Staff en Django): Ve todo para soporte técnico
+        elif usuario.is_staff:
+            return Dispositivo.objects.all()
+            
+        # 3. Cliente/Encargado normal: Ve estrictamente su propia torre
+        return Dispositivo.objects.filter(usuario_encargado=usuario)
+
+from datetime import timedelta
+from django.utils import timezone
 
 class MedicionViewSet(viewsets.ModelViewSet):
-    queryset = Medicion.objects.all()
     serializer_class = MedicionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        usuario = self.request.user
+        
+        # Filtramos correctamente usando el nombre de tu modelo (usuario_encargado)
+        if usuario.is_superuser or usuario.is_staff:
+            queryset = Medicion.objects.all()
+        else:
+            queryset = Medicion.objects.filter(dispositivo__usuario_encargado=usuario)
+        
+        dias = self.request.query_params.get('dias')
+        if dias:
+            try:
+                fecha_inicio = timezone.now() - timedelta(days=int(dias))
+                queryset = queryset.filter(timestamp__gte=fecha_inicio)
+            except ValueError:
+                pass
+                
+        return queryset.order_by('-timestamp')
 
     def perform_create(self, serializer):
         medicion = serializer.save()
-        
         try:
             cultivo = medicion.dispositivo.cultivo_activo
-            
             regla_temp = cultivo.reglas.filter(variable='TEMP').first()
-            
             if regla_temp and medicion.temperatura:
                 if medicion.temperatura > regla_temp.rango_maximo:
                     AlertaGenerada.objects.create(
