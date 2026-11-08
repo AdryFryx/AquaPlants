@@ -1,16 +1,23 @@
+
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // Cuando levantes Django, cambiaremos esto por la IP de tu PC o servidor AWS
-  static const String baseUrl = 'http://127.0.0.1:8000/api'; 
+  // Dirección del servidor Django
+  static const String baseUrl = 'http://127.0.0.1:8000/api';
 
-  // Función REAL para iniciar sesión
+  // Obtener token JWT
+  Future<String?> _getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('jwt_token');
+  }
+
+  // INICIAR SESIÓN
   Future<bool> login(String email, String password) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/token/'), // Endpoint típico de Django JWT
+        Uri.parse('$baseUrl/token/'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': email,
@@ -19,95 +26,139 @@ class ApiService {
       );
 
       if (response.statusCode == 200) {
-        // Si Django responde OK, extraemos el Token
         final data = jsonDecode(response.body);
-        final token = data['access']; // Depende de cómo configures Django (ej. SimpleJWT)
+        final token = data['access'];
 
-        // Guardamos el token encriptado en el almacenamiento del celular
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt_token', token);
-        
-        return true; // Login exitoso
-      } else {
-        return false; // Credenciales incorrectas
+
+        return true;
       }
+
+      return false;
     } catch (e) {
       print('Error de conexión: $e');
-      return false; // Error de red o servidor caído
+      return false;
     }
   }
 
+  // OBTENER MEDICIONES
   Future<List<dynamic>> getMediciones({int? dias}) async {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString('jwt_token');
+    try {
+      final token = await _getToken();
 
-        if (token == null) return [];
+      if (token == null) return [];
 
-        // Construimos la URL dinámica
-        String url = '$baseUrl/mediciones/';
-        if (dias != null) {
-          url += '?dias=$dias';
-        }
+      String url = '$baseUrl/mediciones/';
 
-        final response = await http.get(
-          Uri.parse(url),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-        );
-
-        if (response.statusCode == 200) {
-          return jsonDecode(response.body); 
-        } else {
-          print('Error del servidor: ${response.statusCode}');
-          return [];
-        }
-      } catch (e) {
-        print('Error de red: $e');
-        return [];
+      if (dias != null) {
+        url += '?dias=$dias';
       }
-    }
 
-  // Función para cerrar sesión (borrar el token)
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+
+      print('Error del servidor: ${response.statusCode}');
+      return [];
+    } catch (e) {
+      print('Error de red: $e');
+      return [];
+    }
+  }
+
+  // CERRAR SESIÓN
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('jwt_token');
   }
 
-  // Función para enviar la configuración a Django (CU2)
-  Future<bool> guardarConfiguracion(String tipoPlanta, String tempMax) async {
+  // OBTENER CONFIGURACIÓN DEL CULTIVO (CU2)
+  Future<Map<String, dynamic>?> obtenerConfiguracion() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt_token');
+      final token = await _getToken();
+
+      if (token == null) return null;
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/configuracion/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+
+      print('Error al obtener configuración: ${response.statusCode}');
+      print('Respuesta: ${response.body}');
+      return null;
+    } catch (e) {
+      print('Error al obtener configuración: $e');
+      return null;
+    }
+  }
+
+  // GUARDAR CONFIGURACIÓN DEL CULTIVO (CU2)
+  Future<bool> guardarConfiguracion(
+    String tipoPlanta,
+    String tempMin,
+    String tempMax,
+    String phMin,
+    String phMax,
+    String aguaMin,
+    String aguaMax,
+  ) async {
+    try {
+      final token = await _getToken();
 
       if (token == null) return false;
 
       final response = await http.post(
-        Uri.parse('$baseUrl/configuracion/'), // La ruta que acabamos de crear en Python
+        Uri.parse('$baseUrl/configuracion/'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode({
           'tipo_planta': tipoPlanta,
-          'temp_max': tempMax,
+          'temp_min': double.parse(tempMin),
+          'temp_max': double.parse(tempMax),
+          'ph_min': double.parse(phMin),
+          'ph_max': double.parse(phMax),
+          'agua_min': double.parse(aguaMin),
+          'agua_max': double.parse(aguaMax),
         }),
       );
 
-      return response.statusCode == 200;
+      if (response.statusCode == 200) {
+        return true;
+      }
+
+      print('Error del servidor: ${response.statusCode}');
+      print('Respuesta: ${response.body}');
+      return false;
     } catch (e) {
       print('Error al guardar configuración: $e');
       return false;
     }
   }
 
-  // Función para obtener la lista de alertas
+  // OBTENER ALERTAS
   Future<List<dynamic>> getAlertas() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt_token');
+      final token = await _getToken();
+
       if (token == null) return [];
 
       final response = await http.get(
@@ -117,28 +168,37 @@ class ApiService {
           'Authorization': 'Bearer $token',
         },
       );
-      if (response.statusCode == 200) return jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+
       return [];
     } catch (e) {
+      print('Error al obtener alertas: $e');
       return [];
     }
   }
 
-  // Función para marcar la alerta como leída/resuelta (Botón Verde)
+  // RESOLVER ALERTA
   Future<bool> resolverAlerta(int id) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('jwt_token');
+      final token = await _getToken();
+
+      if (token == null) return false;
+
       final response = await http.post(
         Uri.parse('$baseUrl/alertas/'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({'id': id}), // Enviamos el ID de la alerta a borrar
+        body: jsonEncode({'id': id}),
       );
+
       return response.statusCode == 200;
     } catch (e) {
+      print('Error al resolver alerta: $e');
       return false;
     }
   }
