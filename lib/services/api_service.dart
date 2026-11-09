@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   // Dirección del servidor Django
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
+  final String baseUrl = 'https://api-aquaplants.onrender.com/api';
 
   // Obtener token JWT
   Future<String?> _getToken() async {
