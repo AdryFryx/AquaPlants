@@ -5,8 +5,8 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import viewsets, status
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
@@ -16,8 +16,17 @@ from .models import (
     ReglaUmbral,
     AlertaGenerada
 )
-from .serializers import DispositivoSerializer, MedicionSerializer
 
+from .serializers import (
+    DispositivoSerializer,
+    MedicionSerializer,
+    RegistroSerializer
+)
+
+
+# =====================================================
+# GESTION DE DISPOSITIVOS
+# =====================================================
 
 class DispositivoViewSet(viewsets.ModelViewSet):
     serializer_class = DispositivoSerializer
@@ -29,8 +38,14 @@ class DispositivoViewSet(viewsets.ModelViewSet):
         if usuario.is_superuser or usuario.is_staff:
             return Dispositivo.objects.all()
 
-        return Dispositivo.objects.filter(usuario_encargado=usuario)
+        return Dispositivo.objects.filter(
+            usuario_encargado=usuario
+        )
 
+
+# =====================================================
+# GESTION DE MEDICIONES Y GENERACION DE ALERTAS
+# =====================================================
 
 class MedicionViewSet(viewsets.ModelViewSet):
     serializer_class = MedicionSerializer
@@ -50,8 +65,19 @@ class MedicionViewSet(viewsets.ModelViewSet):
 
         if dias:
             try:
-                fecha_inicio = timezone.now() - timedelta(days=int(dias))
-                queryset = queryset.filter(timestamp__gte=fecha_inicio)
+                cantidad_dias = int(dias)
+
+                if cantidad_dias < 0:
+                    return queryset.none()
+
+                fecha_inicio = timezone.now() - timedelta(
+                    days=cantidad_dias
+                )
+
+                queryset = queryset.filter(
+                    timestamp__gte=fecha_inicio
+                )
+
             except (ValueError, TypeError):
                 pass
 
@@ -99,6 +125,40 @@ class MedicionViewSet(viewsets.ModelViewSet):
             print(f'Error en el motor de alertas: {e}')
 
 
+# =====================================================
+# REGISTRO PUBLICO DE CLIENTES
+# =====================================================
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def registrar_usuario(request):
+    serializer = RegistroSerializer(data=request.data)
+
+    if serializer.is_valid():
+        usuario = serializer.save()
+
+        return Response({
+            'mensaje': 'Cuenta creada exitosamente.',
+            'usuario': {
+                'id': usuario.id,
+                'username': usuario.username,
+                'nombre': usuario.first_name,
+                'apellido': usuario.last_name,
+                'email': usuario.email,
+                'rol': 'CLIENTE'
+            }
+        }, status=status.HTTP_201_CREATED)
+
+    return Response(
+        serializer.errors,
+        status=status.HTTP_400_BAD_REQUEST
+    )
+
+
+# =====================================================
+# CONFIGURACION DEL CULTIVO
+# =====================================================
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def actualizar_configuracion(request):
@@ -108,7 +168,7 @@ def actualizar_configuracion(request):
         if dispositivo is None:
             return Response(
                 {'error': 'No tienes un dispositivo asociado.'},
-                status=400
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         cultivo = getattr(dispositivo, 'cultivo_activo', None)
@@ -116,10 +176,10 @@ def actualizar_configuracion(request):
         if cultivo is None:
             return Response(
                 {'error': 'El dispositivo no tiene un cultivo activo.'},
-                status=400
+                status=status.HTTP_400_BAD_REQUEST
             )
 
-        # CONSULTAR CONFIGURACIÓN
+        # CONSULTAR CONFIGURACION
         if request.method == 'GET':
             reglas = {
                 regla.variable: {
@@ -143,7 +203,7 @@ def actualizar_configuracion(request):
             if not tipo_planta or len(tipo_planta) > 100:
                 return Response(
                     {'error': 'El nombre de la planta no es válido.'},
-                    status=400
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
             cultivo.tipo_planta = tipo_planta
@@ -160,7 +220,10 @@ def actualizar_configuracion(request):
         for variable, campos in variables.items():
             campo_min, campo_max = campos
 
-            if campo_min not in request.data and campo_max not in request.data:
+            if (
+                campo_min not in request.data
+                and campo_max not in request.data
+            ):
                 continue
 
             regla_actual = cultivo.reglas.filter(
@@ -180,28 +243,35 @@ def actualizar_configuracion(request):
             if minimo is None or maximo is None:
                 return Response(
                     {'error': f'Faltan valores para {variable}.'},
-                    status=400
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
             try:
                 minimo = float(minimo)
                 maximo = float(maximo)
+
             except (ValueError, TypeError):
                 return Response(
-                    {'error': f'Los valores de {variable} deben ser numéricos.'},
-                    status=400
+                    {
+                        'error':
+                        f'Los valores de {variable} deben ser numéricos.'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
             if not math.isfinite(minimo) or not math.isfinite(maximo):
                 return Response(
                     {'error': f'Los valores de {variable} no son válidos.'},
-                    status=400
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
             if minimo >= maximo:
                 return Response(
-                    {'error': f'El mínimo de {variable} debe ser menor que el máximo.'},
-                    status=400
+                    {
+                        'error':
+                        f'El mínimo de {variable} debe ser menor que el máximo.'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
             reglas[variable] = {
@@ -209,7 +279,7 @@ def actualizar_configuracion(request):
                 'rango_maximo': maximo
             }
 
-        # GUARDAR CONFIGURACIÓN
+        # GUARDAR CONFIGURACION
         with transaction.atomic():
             cultivo.save()
 
@@ -224,37 +294,44 @@ def actualizar_configuracion(request):
             'mensaje': 'Configuración guardada exitosamente.',
             'tipo_planta': cultivo.tipo_planta,
             'reglas_actualizadas': list(reglas.keys())
-        }, status=200)
+        }, status=status.HTTP_200_OK)
 
     except Exception as e:
         print(f'Error en configuración: {e}')
+
         return Response(
             {'error': 'No se pudo procesar la configuración.'},
-            status=400
+            status=status.HTTP_400_BAD_REQUEST
         )
 
+
+# =====================================================
+# GESTION DE ALERTAS
+# =====================================================
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def gestionar_alertas(request):
-    dispositivo = request.user.dispositivos.first()
+    usuario = request.user
 
-    if dispositivo is None:
-        if request.method == 'GET':
-            return Response([])
-
-        return Response(
-            {'error': 'No tienes un dispositivo asociado.'},
-            status=400
+    if usuario.is_superuser or usuario.is_staff:
+        alertas_queryset = AlertaGenerada.objects.all()
+    else:
+        alertas_queryset = AlertaGenerada.objects.filter(
+            medicion__dispositivo__usuario_encargado=usuario
         )
 
     if request.method == 'GET':
-        alertas = AlertaGenerada.objects.filter(
-            medicion__dispositivo=dispositivo
+        alertas = alertas_queryset.select_related(
+            'medicion',
+            'medicion__dispositivo'
         ).order_by('-id')[:15]
 
         data = [
-            {'id': alerta.id, 'mensaje': alerta.mensaje}
+            {
+                'id': alerta.id,
+                'mensaje': alerta.mensaje
+            }
             for alerta in alertas
         ]
 
@@ -265,20 +342,19 @@ def gestionar_alertas(request):
     if alerta_id is None:
         return Response(
             {'error': 'Debes proporcionar el ID de la alerta.'},
-            status=400
+            status=status.HTTP_400_BAD_REQUEST
         )
 
-    eliminadas, _ = AlertaGenerada.objects.filter(
-        id=alerta_id,
-        medicion__dispositivo=dispositivo
+    eliminadas, _ = alertas_queryset.filter(
+        id=alerta_id
     ).delete()
 
     if eliminadas == 0:
         return Response(
             {'error': 'No se encontró la alerta.'},
-            status=404
+            status=status.HTTP_404_NOT_FOUND
         )
 
     return Response({
-        'mensaje': 'Alerta resuelta exitosamente'
+        'mensaje': 'Alerta resuelta exitosamente.'
     })
