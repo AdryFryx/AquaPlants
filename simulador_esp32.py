@@ -49,15 +49,20 @@ while True:
     }
 
     try:
-        # 4. Enviamos los datos INCLUYENDO los headers con el token
-        respuesta = requests.post(API_URL, json=payload, headers=headers)
+        # Agregamos timeout=10 (espera máximo 10 segundos antes de rendirse y seguir)
+        respuesta = requests.post(API_URL, json=payload, headers=headers, timeout=10)
         
         if respuesta.status_code == 201:
             print(f"✅ Enviado -> Temp: {temperatura}°C | pH: {ph} | Agua: {nivel_agua}%")
+        elif respuesta.status_code == 401:
+            print("⚠️ El token expiró por seguridad. Cancela el script (Ctrl+C) y vuélvelo a ejecutar.")
+            break
         else:
             print(f"⚠️ Error al enviar: {respuesta.status_code} - {respuesta.text}")
             
+    except requests.exceptions.Timeout:
+        print("⏳ Render tardó demasiado en responder. Saltando al siguiente intento...")
     except requests.exceptions.ConnectionError:
-        print("❌ Error de conexión al enviar datos.")
+        print("❌ Error de red transitorio.")
 
     time.sleep(5)
