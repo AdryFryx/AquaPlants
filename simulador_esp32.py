@@ -2,10 +2,10 @@ import time
 import random
 import requests
 
-# URL de tu API local (Endpoint de mediciones)
-API_URL = "http://127.0.0.1:8000/api/mediciones/"
+# 1. ACTUALIZADO: URL de tu API en la nube (Render)
+API_URL = "https://aquaplants.onrender.com/api/mediciones/"
 
-# El ID de tu dispositivo en la base de datos (como fue el primero que creaste, es el 1)
+# El ID de tu dispositivo en la base de datos (verifica que sea el 1)
 DISPOSITIVO_ID = 1
 
 print("Iniciando simulación del ESP32 para AquaPlants...")
@@ -32,10 +32,11 @@ while True:
         if respuesta.status_code == 201:
             print(f"✅ Enviado -> Temp: {temperatura}°C | pH: {ph} | Agua: {nivel_agua}%")
         else:
+            # 2. ACTUALIZADO: Se arregló el error de salto de línea en el print
             print(f"⚠️ Error al enviar: {respuesta.status_code} - {respuesta.text}")
             
     except requests.exceptions.ConnectionError:
-        print("❌ Error de conexión: ¿El servidor de Django está encendido?")
+        print("❌ Error de conexión: Revisa si el servidor en Render está funcionando.")
 
     # El ESP32 "duerme" 5 segundos antes de enviar el siguiente dato
     time.sleep(5)
