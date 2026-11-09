@@ -4,8 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // Dirección del servidor Django
-  final String baseUrl = 'https://api-aquaplants.onrender.com/api';
+  final String baseUrl = 'https://aquaplants.onrender.com/api';
 
   // Obtener token JWT
   Future<String?> _getToken() async {
