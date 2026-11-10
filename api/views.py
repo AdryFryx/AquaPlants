@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login as auth_login
+from django.contrib.auth import authenticate, login as auth_login, login_required
 from django.contrib import messages
 from .permissions import es_administrador, es_supervisor
 import math
@@ -385,3 +385,11 @@ def login_web(request):
             
     # 3. Si solo está cargando la página (Método GET), mostramos el HTML en blanco
     return render(request, 'api/login_web.html')
+
+@login_required(login_url='login_web')
+def dashboard_admin(request):
+    # Aquí validaremos de nuevo por seguridad que sea admin o supervisor
+    if not (es_administrador(request.user) or es_supervisor(request.user)):
+        return redirect('login_web')
+        
+    return render(request, 'api/dashboard_admin.html')

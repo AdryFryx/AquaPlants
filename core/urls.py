@@ -3,7 +3,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import (TokenObtainPairView,TokenRefreshView)
 from api.views import (DispositivoViewSet,MedicionViewSet,actualizar_configuracion,gestionar_alertas,registrar_usuario)
-from api.views import login_web
+from api.views import login_web, dashboard_admin
 
 # ENRUTADOR DE LA API
 router = DefaultRouter()
@@ -25,4 +25,5 @@ urlpatterns = [
     # DISPOSITIVOS Y MEDICIONES
     path('api/', include(router.urls)),
     path('login-admin/', login_web, name='login_web'),
+    path('dashboard-admin/', dashboard_admin, name='dashboard_admin'),
 ]
