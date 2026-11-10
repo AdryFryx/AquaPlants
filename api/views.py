@@ -1,8 +1,9 @@
 import math
+import json
 from datetime import timedelta
 
 from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login as auth_login
+from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User, Group
@@ -296,9 +297,27 @@ def dashboard_admin(request):
         }
         
     elif es_supervisor(usuario_actual):
+        informes = InformeFalla.objects.filter(supervisor_asignado=usuario_actual, estado='PENDIENTE').select_related('dispositivo', 'dispositivo__usuario_encargado')
+        
+        # Preparamos un diccionario con los datos históricos para los gráficos
+        datos_graficos = {}
+        for informe in informes:
+            # Traemos las últimas 15 mediciones del dispositivo afectado
+            mediciones = list(Medicion.objects.filter(dispositivo=informe.dispositivo).order_by('-timestamp')[:15])
+            mediciones.reverse() # Las volteamos para que queden en orden cronológico (de más antigua a más nueva)
+            
+            datos_graficos[informe.id] = {
+                'etiquetas': [m.timestamp.strftime('%H:%M') for m in mediciones],
+                'temperatura': [m.temperatura if m.temperatura else 0 for m in mediciones],
+                'ph': [m.ph if m.ph else 0 for m in mediciones],
+                'agua': [m.nivel_agua if m.nivel_agua else 0 for m in mediciones]
+            }
+
         contexto = {
             'rol': 'Supervisor',
-            'informes_pendientes': InformeFalla.objects.filter(supervisor_asignado=usuario_actual, estado='PENDIENTE'),
+            'informes_pendientes': informes,
+            # Convertimos el diccionario a JSON para que JavaScript pueda leerlo fácilmente
+            'datos_graficos_json': json.dumps(datos_graficos) 
         }
 
     return render(request, 'api/dashboard_admin.html', contexto)
@@ -450,3 +469,8 @@ def cambiar_estado_dispositivo(request):
         messages.error(request, 'Error al cambiar el estado: Dispositivo no encontrado.')
         
     return redirect('dashboard_admin')
+
+def logout_web(request):
+    auth_logout(request) # Esto destruye la sesión y la cookie
+    messages.success(request, 'Has cerrado sesión exitosamente.')
+    return redirect('login_web')

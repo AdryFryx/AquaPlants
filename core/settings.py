@@ -148,3 +148,8 @@ REST_FRAMEWORK = {
     ),
 }
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+AUTHENTICATION_BACKENDS = [
+    'api.backends.EmailOrUsernameModelBackend', 
+    'django.contrib.auth.backends.ModelBackend',
+]

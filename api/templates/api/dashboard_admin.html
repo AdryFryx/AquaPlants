@@ -15,8 +15,7 @@
             <a class="navbar-brand fw-bold" href="#">🌱 AquaPlants | Panel de {{ rol }}</a>
             <div class="d-flex text-white align-items-center">
                 <span class="me-3"><i class="bi bi-person-circle"></i> {{ request.user.username }}</span>
-                <a href="{% url 'login_web' %}" class="btn btn-sm btn-outline-light">Cerrar Sesión</a>
-            </div>
+                <a href="{% url 'logout_web' %}" class="btn btn-sm btn-outline-light">Cerrar Sesión</a>            </div>
         </div>
     </nav>
 
@@ -242,6 +241,7 @@
             </div>
 
             {% elif rol == 'Supervisor' %}
+            
             <h3 class="mb-4 text-warning"><i class="bi bi-tools"></i> Mis Tickets de Mantenimiento</h3>
             
             <div class="card shadow-sm border-0">
@@ -254,27 +254,68 @@
                                     <th>Dispositivo Afectado</th>
                                     <th>Descripción de la Falla</th>
                                     <th>Reportado por</th>
-                                    <th>Acción</th>
+                                    <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for informe in informes_pendientes %}
                                 <tr>
                                     <td>{{ informe.fecha_creacion|date:"d/m/Y H:i" }}</td>
-                                    <td class="fw-bold">{{ informe.dispositivo.nombre_instalacion }} <br> <span class="badge bg-secondary">{{ informe.dispositivo.mac_address }}</span></td>
+                                    <td class="fw-bold">
+                                        {{ informe.dispositivo.nombre_instalacion }} <br> 
+                                        <span class="badge bg-secondary">{{ informe.dispositivo.mac_address }}</span><br>
+                                        <small class="text-muted">Cliente: {{ informe.dispositivo.usuario_encargado.first_name }}</small>
+                                    </td>
                                     <td class="text-danger">{{ informe.descripcion }}</td>
                                     <td>{{ informe.administrador_creador.first_name }} (Admin)</td>
                                     <td>
+                                        <!-- Botón para ver el historial y comparar variables -->
+                                        <button class="btn btn-sm btn-info fw-bold text-white mb-1 w-100" data-bs-toggle="modal" data-bs-target="#modalAnalisis{{ informe.id }}">
+                                            <i class="bi bi-graph-up"></i> Analizar Datos
+                                        </button>
+                                        
                                         <!-- Botón para cerrar el ticket -->
-                                        <form action="{% url 'resolver_informe' %}" method="POST">
+                                        <form action="{% url 'resolver_informe' %}" method="POST" class="w-100">
                                             {% csrf_token %}
                                             <input type="hidden" name="informe_id" value="{{ informe.id }}">
-                                            <button type="submit" class="btn btn-sm btn-success fw-bold">
-                                                <i class="bi bi-check-circle"></i> Marcar Resuelto
+                                            <button type="submit" class="btn btn-sm btn-success fw-bold w-100">
+                                                <i class="bi bi-check-circle"></i> Resuelto
                                             </button>
                                         </form>
                                     </td>
                                 </tr>
+
+                                <!-- Modal de Análisis de Datos -->
+                                <div class="modal fade" id="modalAnalisis{{ informe.id }}" tabindex="-1">
+                                    <div class="modal-dialog modal-xl">
+                                        <div class="modal-content">
+                                            <div class="modal-header bg-info text-white">
+                                                <h5 class="modal-title fw-bold"><i class="bi bi-activity"></i> Análisis Histórico: {{ informe.dispositivo.nombre_instalacion }}</h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="row">
+                                                    <!-- Gráfico de Temperatura -->
+                                                    <div class="col-md-6 mb-4">
+                                                        <h6 class="text-center fw-bold text-danger">Temperatura (°C)</h6>
+                                                        <!-- El contenedor con position relative y height es vital -->
+                                                        <div style="position: relative; height: 300px; width: 100%;">
+                                                            <canvas id="chartTemp{{ informe.id }}"></canvas>
+                                                        </div>
+                                                    </div>
+                                                    <!-- Gráfico de Agua y pH mezclados para comparar -->
+                                                    <div class="col-md-6 mb-4">
+                                                        <h6 class="text-center fw-bold text-primary">Nivel de Agua (%) vs pH</h6>
+                                                        <div style="position: relative; height: 300px; width: 100%;">
+                                                            <canvas id="chartAguaPh{{ informe.id }}"></canvas>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {% empty %}
                                 <tr>
                                     <td colspan="5" class="text-center text-muted py-4">
@@ -288,6 +329,84 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Importar Chart.js -->
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            
+            <!-- Lógica para renderizar los gráficos usando los datos enviados desde Python -->
+            <script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    const datos = JSON.parse('{{ datos_graficos_json|safe }}');
+                    let graficosActivos = {}; // Memoria para no dibujar el mismo gráfico dos veces
+
+                    // Buscamos todos los modales que empiezan con "modalAnalisis"
+                    const modales = document.querySelectorAll('[id^="modalAnalisis"]');
+
+                    modales.forEach(modal => {
+                        // Este evento se dispara cuando la animación del modal termina de abrirse
+                        modal.addEventListener('shown.bs.modal', function () {
+                            const informeId = this.id.replace('modalAnalisis', '');
+                            const info = datos[informeId];
+
+                            // Si ya dibujamos estos gráficos antes, detenemos la ejecución para no duplicarlos
+                            if (graficosActivos[informeId]) return;
+
+                            // 1. Gráfico de Temperatura
+                            new Chart(document.getElementById('chartTemp' + informeId), {
+                                type: 'line',
+                                data: {
+                                    labels: info.etiquetas,
+                                    datasets: [{
+                                        label: 'Temperatura °C',
+                                        data: info.temperatura,
+                                        borderColor: 'rgba(220, 53, 69, 1)',
+                                        backgroundColor: 'rgba(220, 53, 69, 0.2)',
+                                        tension: 0.3,
+                                        fill: true
+                                    }]
+                                },
+                                // maintainAspectRatio: false obliga al gráfico a respetar el height de 300px que le dimos
+                                options: { responsive: true, maintainAspectRatio: false }
+                            });
+
+                            // 2. Gráfico Comparativo (Agua vs pH)
+                            new Chart(document.getElementById('chartAguaPh' + informeId), {
+                                type: 'line',
+                                data: {
+                                    labels: info.etiquetas,
+                                    datasets: [
+                                        {
+                                            label: 'Nivel Agua %',
+                                            data: info.agua,
+                                            borderColor: 'rgba(13, 110, 253, 1)',
+                                            yAxisID: 'y',
+                                            tension: 0.3
+                                        },
+                                        {
+                                            label: 'Nivel pH',
+                                            data: info.ph,
+                                            borderColor: 'rgba(255, 193, 7, 1)',
+                                            yAxisID: 'y1',
+                                            tension: 0.3
+                                        }
+                                    ]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        y: { type: 'linear', position: 'left', title: {display: true, text:'Agua %'} },
+                                        y1: { type: 'linear', position: 'right', title: {display: true, text:'pH'}, grid: {drawOnChartArea: false} }
+                                    }
+                                }
+                            });
+
+                            // Marcamos este modal como "ya dibujado"
+                            graficosActivos[informeId] = true; 
+                        });
+                    });
+                });
+            </script>
 
         {% endif %}
     </div>

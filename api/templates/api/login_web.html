@@ -32,8 +32,8 @@
                         <form method="POST">
                             {% csrf_token %}
                             <div class="mb-3 text-start">
-                                <label class="form-label">Usuario</label>
-                                <input type="text" name="username" class="form-control" required>
+                                <label class="form-label fw-bold">Usuario o Correo Electrónico</label>
+                                <input type="text" name="username" class="form-control" placeholder="ejemplo@correo.com o tu_usuario" required>
                             </div>
                             <div class="mb-4 text-start">
                                 <label class="form-label">Contraseña</label>
