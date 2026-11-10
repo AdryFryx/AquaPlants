@@ -13,6 +13,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final ApiService _apiService = ApiService();
   Timer? _timer;
+  bool _isFetching = false; // El semáforo
   
   // Variables en blanco para iniciar
   String tempActual = '--';
@@ -20,6 +21,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String phActual = '--';
   List<FlSpot> historialAgua = [];
 
+  // 1. EL ENCENDIDO (Esto es lo que faltaba llamar)
   @override
   void initState() {
     super.initState();
@@ -29,33 +31,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  // 2. EL APAGADO
   @override
   void dispose() {
-    _timer?.cancel(); // Apagamos el temporizador al salir de la pantalla
+    _timer?.cancel();
     super.dispose();
   }
 
+  // 3. LA FUNCIÓN CON EL SEMÁFORO
   Future<void> _cargarDatos() async {
-    final datos = await _apiService.getMediciones();
+    if (_isFetching) return; 
     
-    if (datos.isNotEmpty && mounted) {
-      // Tomamos la última medición (la más reciente suele ser la última de la lista)
-      final ultima = datos.last;
-      
-      // Tomamos los últimos 7 registros para el gráfico de nivel de agua
-      final ultimos7 = datos.length > 7 ? datos.sublist(datos.length - 7) : datos;
-      List<FlSpot> spotsTemporales = [];
-      
-      for (int i = 0; i < ultimos7.length; i++) {
-        spotsTemporales.add(FlSpot(i.toDouble(), (ultimos7[i]['nivel_agua'] as num).toDouble()));
-      }
+    _isFetching = true; 
 
-      setState(() {
-        tempActual = '${ultima['temperatura']}°C';
-        aguaActual = '${ultima['nivel_agua']}%';
-        phActual = '${ultima['ph']}';
-        historialAgua = spotsTemporales;
-      });
+    try {
+      final datos = await _apiService.getMediciones();
+      
+      if (datos.isNotEmpty && mounted) {
+        final ultima = datos.last;
+        final ultimos7 = datos.length > 7 ? datos.sublist(datos.length - 7) : datos;
+        List<FlSpot> spotsTemporales = [];
+        
+        for (int i = 0; i < ultimos7.length; i++) {
+          spotsTemporales.add(FlSpot(i.toDouble(), (ultimos7[i]['nivel_agua'] as num).toDouble()));
+        }
+
+        setState(() {
+          tempActual = '${ultima['temperatura']}°C';
+          aguaActual = '${ultima['nivel_agua']}%';
+          phActual = '${ultima['ph']}';
+          historialAgua = spotsTemporales;
+        });
+      }
+    } catch (e) {
+      print("Error silencioso al cargar: $e");
+    } finally {
+      _isFetching = false; 
     }
   }
 
