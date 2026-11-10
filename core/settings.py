@@ -153,3 +153,5 @@ AUTHENTICATION_BACKENDS = [
     'api.backends.EmailOrUsernameModelBackend', 
     'django.contrib.auth.backends.ModelBackend',
 ]
+
+CSRF_TRUSTED_ORIGINS = ['https://aquaplants.onrender.com']
