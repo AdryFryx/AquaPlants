@@ -1,10 +1,11 @@
-
+from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login as auth_login
+from django.contrib import messages
+from .permissions import es_administrador, es_supervisor
 import math
 from datetime import timedelta
-
 from django.db import transaction
 from django.utils import timezone
-
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import api_view, permission_classes
@@ -358,3 +359,29 @@ def gestionar_alertas(request):
     return Response({
         'mensaje': 'Alerta resuelta exitosamente.'
     })
+
+def login_web(request):
+    # 1. Si ya tiene la sesión iniciada, lo mandamos directo al dashboard
+    if request.user.is_authenticated:
+        return redirect('dashboard_admin') # Esta ruta la crearemos en el siguiente paso
+
+    # 2. Si el usuario presiona el botón "Iniciar Sesión" (Método POST)
+    if request.method == 'POST':
+        usuario = request.POST.get('username')
+        contrasena = request.POST.get('password')
+        
+        # Django verifica si el usuario y clave existen en la base de datos
+        user = authenticate(request, username=usuario, password=contrasena)
+        
+        if user is not None:
+            # Verificamos si tiene el rol correcto usando las funciones de tu permissions.py
+            if es_administrador(user) or es_supervisor(user):
+                auth_login(request, user) # Creamos la cookie de sesión
+                return redirect('dashboard_admin')
+            else:
+                messages.error(request, 'No tienes permisos de Administrador o Supervisor para entrar aquí.')
+        else:
+            messages.error(request, 'Usuario o contraseña incorrectos.')
+            
+    # 3. Si solo está cargando la página (Método GET), mostramos el HTML en blanco
+    return render(request, 'api/login_web.html')

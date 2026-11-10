@@ -1,4 +1,3 @@
-
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction

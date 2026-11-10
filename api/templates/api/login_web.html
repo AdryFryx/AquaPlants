@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - AquaPlants Admin</title>
+    <!-- Importamos Bootstrap para un diseño rápido y limpio -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f4f7f6; height: 100vh; display: flex; align-items: center; }
+        .login-card { border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border: none; }
+        .btn-primary { background-color: #00BFA5; border: none; }
+        .btn-primary:hover { background-color: #009688; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-5">
+                <div class="card login-card p-4">
+                    <div class="card-body text-center">
+                        <h2 class="mb-4" style="color: #004D40; font-weight: bold;">AquaPlants</h2>
+                        <h5 class="mb-4 text-muted">Acceso Administrativo</h5>
+                        
+                        <!-- Mensajes de error (si pone mal la clave o no tiene permisos) -->
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-danger">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+
+                        <form method="POST">
+                            {% csrf_token %}
+                            <div class="mb-3 text-start">
+                                <label class="form-label">Usuario</label>
+                                <input type="text" name="username" class="form-control" required>
+                            </div>
+                            <div class="mb-4 text-start">
+                                <label class="form-label">Contraseña</label>
+                                <input type="password" name="password" class="form-control" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">Iniciar Sesión</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
