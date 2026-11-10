@@ -3,34 +3,294 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - AquaPlants</title>
+    <title>Panel {{ rol }} - AquaPlants</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 </head>
 <body class="bg-light">
     
-    <!-- Barra de navegación superior -->
-    <nav class="navbar navbar-dark" style="background-color: #004D40;">
+    <!-- Barra de navegación -->
+    <nav class="navbar navbar-expand-lg navbar-dark shadow-sm" style="background-color: #004D40;">
         <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">AquaPlants Dashboard</span>
-            <span class="navbar-text text-white">
-                Hola, {{ request.user.username }} | Rol: {% if request.user.is_superuser %}Administrador{% else %}Supervisor{% endif %}
-            </span>
+            <a class="navbar-brand fw-bold" href="#">🌱 AquaPlants | Panel de {{ rol }}</a>
+            <div class="d-flex text-white align-items-center">
+                <span class="me-3"><i class="bi bi-person-circle"></i> {{ request.user.username }}</span>
+                <a href="{% url 'login_web' %}" class="btn btn-sm btn-outline-light">Cerrar Sesión</a>
+            </div>
         </div>
     </nav>
 
     <!-- Contenido principal -->
-    <div class="container mt-5">
-        <div class="row">
-            <div class="col">
-                <div class="card shadow-sm">
-                    <div class="card-body text-center py-5">
-                        <h2 class="text-success">¡Inicio de sesión exitoso!</h2>
-                        <p class="lead">El sistema de redirección y permisos web está funcionando.</p>
+    <div class="container mt-4">
+        
+        {% if rol == 'Administrador' %}
+            
+            <h3 class="mb-4 text-success"><i class="bi bi-cpu"></i> Gestión de Dispositivos</h3>
+            
+            <!-- Tabla de Dispositivos -->
+            <div class="card shadow-sm mb-5 border-0">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Instalación</th>
+                                    <th>MAC Address</th>
+                                    <th>Cliente Encargado</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for disp in dispositivos %}
+                                <tr>
+                                    <td class="fw-bold">{{ disp.nombre_instalacion }}</td>
+                                    <td><span class="badge bg-secondary">{{ disp.mac_address }}</span></td>
+                                    <td>{{ disp.usuario_encargado.first_name }} {{ disp.usuario_encargado.last_name }} (@{{ disp.usuario_encargado.username }})</td>
+                                    <td>
+                                        <!-- Formulario para cambiar el estado con 1 clic -->
+                                        <form action="{% url 'cambiar_estado_dispositivo' %}" method="POST" class="m-0 p-0">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="dispositivo_id" value="{{ disp.id }}">
+                                            {% if disp.estado_conexion %}
+                                                <button type="submit" class="badge bg-success border-0 px-3 py-2" title="Clic para marcar como desconectado" style="cursor: pointer;">
+                                                    <i class="bi bi-wifi"></i> En línea
+                                                </button>
+                                            {% else %}
+                                                <button type="submit" class="badge bg-danger border-0 px-3 py-2" title="Clic para marcar como conectado" style="cursor: pointer;">
+                                                    <i class="bi bi-wifi-off"></i> Desconectado
+                                                </button>
+                                            {% endif %}
+                                        </form>
+                                    </td>
+                                    <td>
+                                        <!-- Botón que abre el Modal -->
+                                        <button type="button" class="btn btn-sm btn-warning fw-bold text-dark" data-bs-toggle="modal" data-bs-target="#modalFalla{{ disp.id }}">
+                                            <i class="bi bi-exclamation-triangle"></i> Reportar Falla
+                                        </button>
+
+                                        <!-- Ventana Flotante (Modal) para este dispositivo -->
+                                        <div class="modal fade" id="modalFalla{{ disp.id }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content text-start">
+                                                    <div class="modal-header bg-warning">
+                                                        <h5 class="modal-title fw-bold text-dark"><i class="bi bi-tools"></i> Nuevo Informe de Falla</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <!-- Formulario que enviará los datos a Django -->
+                                                    <form action="{% url 'crear_informe' %}" method="POST">
+                                                        {% csrf_token %}
+                                                        <div class="modal-body">
+                                                            <p><strong>Dispositivo:</strong> {{ disp.nombre_instalacion }} ({{ disp.mac_address }})</p>
+                                                            <input type="hidden" name="dispositivo_id" value="{{ disp.id }}">
+                                                            
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-bold">Asignar a Supervisor:</label>
+                                                                <select name="supervisor_id" class="form-select" required>
+                                                                    <option value="" disabled selected>Selecciona un supervisor...</option>
+                                                                    {% for sup in supervisores %}
+                                                                        <option value="{{ sup.id }}">{{ sup.first_name }} {{ sup.last_name }} (@{{ sup.username }})</option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            </div>
+                                                            
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-bold">Descripción del problema:</label>
+                                                                <textarea name="descripcion" class="form-control" rows="3" placeholder="Ej: La bomba de agua no responde o el nivel de pH es crítico..." required></textarea>
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                            <button type="submit" class="btn btn-primary text-dark fw-bold" style="background-color: #00BFA5; border: none;">Enviar Informe</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-3">No hay dispositivos registrados en el sistema.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="text-primary m-0"><i class="bi bi-people"></i> Directorio de Clientes</h3>
+                <button class="btn btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#modalNuevoCliente">
+                    <i class="bi bi-person-plus"></i> Nuevo Cliente
+                </button>
+            </div>
+<!-- Modal Nuevo Cliente y Dispositivo -->
+            <div class="modal fade" id="modalNuevoCliente" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title fw-bold">Registrar Cliente y Dispositivo</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form action="{% url 'crear_cliente_web' %}" method="POST">
+                            {% csrf_token %}
+                            <div class="modal-body">
+                                <h6 class="text-primary fw-bold border-bottom pb-2">1. Datos del Cliente</h6>
+                                <div class="row">
+                                    <div class="col-md-4 mb-3"><label class="form-label">Usuario</label><input type="text" name="username" class="form-control" required></div>
+                                    <div class="col-md-4 mb-3"><label class="form-label">Nombre</label><input type="text" name="nombre" class="form-control" required></div>
+                                    <div class="col-md-4 mb-3"><label class="form-label">Apellido</label><input type="text" name="apellido" class="form-control" required></div>
+                                    <div class="col-md-4 mb-3"><label class="form-label">Contraseña</label><input type="password" name="password" class="form-control" required></div>
+                                    <div class="col-md-4 mb-3"><label class="form-label">Correo</label><input type="email" name="email" class="form-control" required></div>
+                                    <div class="col-md-4 mb-3"><label class="form-label">Teléfono</label><input type="text" name="telefono" class="form-control"></div>
+                                </div>
+                                <h6 class="text-success fw-bold border-bottom pb-2 mt-2">2. Asignar Dispositivo ESP32</h6>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3"><label class="form-label">MAC Address (Ej: 00:1B:44:11:3A:B7)</label><input type="text" name="mac_address" class="form-control" required></div>
+                                    <div class="col-md-6 mb-3"><label class="form-label">Nombre de Instalación</label><input type="text" name="nombre_instalacion" class="form-control" placeholder="Ej: Invernadero Norte" required></div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Registrar Todo</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de Clientes -->
+            <div class="card shadow-sm border-0 mb-5">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Nombre</th>
+                                    <th>Contacto</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cliente in clientes %}
+                                <tr>
+                                    <td class="fw-bold text-primary">@{{ cliente.username }}</td>
+                                    <td>{{ cliente.first_name }} {{ cliente.last_name }}</td>
+                                    <td>{{ cliente.email }} <br> <small class="text-muted">{{ cliente.perfil.telefono|default:"Sin teléfono" }}</small></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEditar{{ cliente.id }}"><i class="bi bi-pencil"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalEliminar{{ cliente.id }}"><i class="bi bi-trash"></i></button>
+                                    </td>
+                                </tr>
+
+                                <!-- Modal Editar Cliente -->
+                                <div class="modal fade" id="modalEditar{{ cliente.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header bg-primary text-white">
+                                                <h5 class="modal-title">Editar Cliente @{{ cliente.username }}</h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form action="{% url 'editar_cliente_web' %}" method="POST">
+                                                {% csrf_token %}
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="cliente_id" value="{{ cliente.id }}">
+                                                    <div class="mb-3"><label>Nombre</label><input type="text" name="nombre" class="form-control" value="{{ cliente.first_name }}"></div>
+                                                    <div class="mb-3"><label>Apellido</label><input type="text" name="apellido" class="form-control" value="{{ cliente.last_name }}"></div>
+                                                    <div class="mb-3"><label>Correo</label><input type="email" name="email" class="form-control" value="{{ cliente.email }}"></div>
+                                                    <div class="mb-3"><label>Teléfono</label><input type="text" name="telefono" class="form-control" value="{{ cliente.perfil.telefono }}"></div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Modal Eliminar Cliente -->
+                                <div class="modal fade" id="modalEliminar{{ cliente.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header bg-danger text-white">
+                                                <h5 class="modal-title">Eliminar Cliente</h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form action="{% url 'eliminar_cliente_web' %}" method="POST">
+                                                {% csrf_token %}
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="cliente_id" value="{{ cliente.id }}">
+                                                    <p>¿Estás seguro de que deseas eliminar a <strong>{{ cliente.first_name }} {{ cliente.last_name }}</strong>?</p>
+                                                    <p class="text-danger fw-bold"><i class="bi bi-exclamation-triangle"></i> ¡ATENCIÓN! Esto borrará también sus dispositivos, configuraciones y el historial de agua.</p>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-danger">Sí, Eliminar</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {% elif rol == 'Supervisor' %}
+            <h3 class="mb-4 text-warning"><i class="bi bi-tools"></i> Mis Tickets de Mantenimiento</h3>
+            
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Fecha del Reporte</th>
+                                    <th>Dispositivo Afectado</th>
+                                    <th>Descripción de la Falla</th>
+                                    <th>Reportado por</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for informe in informes_pendientes %}
+                                <tr>
+                                    <td>{{ informe.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                                    <td class="fw-bold">{{ informe.dispositivo.nombre_instalacion }} <br> <span class="badge bg-secondary">{{ informe.dispositivo.mac_address }}</span></td>
+                                    <td class="text-danger">{{ informe.descripcion }}</td>
+                                    <td>{{ informe.administrador_creador.first_name }} (Admin)</td>
+                                    <td>
+                                        <!-- Botón para cerrar el ticket -->
+                                        <form action="{% url 'resolver_informe' %}" method="POST">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="informe_id" value="{{ informe.id }}">
+                                            <button type="submit" class="btn btn-sm btn-success fw-bold">
+                                                <i class="bi bi-check-circle"></i> Marcar Resuelto
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        <i class="bi bi-emoji-smile fs-3"></i><br>
+                                        No tienes fallas pendientes por revisar. ¡El sistema está estable!
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        {% endif %}
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

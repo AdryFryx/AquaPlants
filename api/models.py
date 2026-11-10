@@ -1,6 +1,22 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+# =====================================================
+# 1. PERFIL DE USUARIO (Para dirección y contacto)
+# =====================================================
+class PerfilUsuario(models.Model):
+    usuario = models.OneToOneField(User, on_delete=models.CASCADE, related_name='perfil')
+    telefono = models.CharField(max_length=20, blank=True, null=True)
+    direccion = models.CharField(max_length=255, blank=True, null=True)
+    # Aquí puedes agregar más campos si el admin necesita saber más del cliente
+
+    def __str__(self):
+        return f"Perfil de {self.usuario.username}"
+
+
+# =====================================================
+# 2. DISPOSITIVOS Y CULTIVOS
+# =====================================================
 class Dispositivo(models.Model):
     mac_address = models.CharField(max_length=17, unique=True, help_text="MAC del ESP32")
     usuario_encargado = models.ForeignKey(User, on_delete=models.CASCADE, related_name='dispositivos')
@@ -9,6 +25,7 @@ class Dispositivo(models.Model):
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
+        # ERROR ARREGLADO: Todo en una sola línea
         return f"{self.nombre_instalacion} - {self.mac_address}"
 
 class Cultivo(models.Model):
@@ -34,8 +51,11 @@ class ReglaUmbral(models.Model):
     def __str__(self):
         return f"Regla {self.variable} para {self.cultivo.tipo_planta}"
 
+
+# =====================================================
+# 3. MEDICIONES Y ALERTAS
+# =====================================================
 class Medicion(models.Model):
-    # Esta es la tabla masiva que en producción pasaremos a TimescaleDB
     dispositivo = models.ForeignKey(Dispositivo, on_delete=models.CASCADE, related_name='mediciones')
     temperatura = models.FloatField(null=True, blank=True)
     nivel_agua = models.FloatField(null=True, blank=True)
@@ -53,3 +73,27 @@ class AlertaGenerada(models.Model):
 
     def __str__(self):
         return f"ALERTA: {self.mensaje}"
+
+
+# =====================================================
+# 4. INFORMES DE FALLA (Para el flujo Admin -> Supervisor)
+# =====================================================
+class InformeFalla(models.Model):
+    ESTADOS = [
+        ('PENDIENTE', 'Pendiente de Revisión'),
+        ('REVISION', 'En Revisión por Supervisor'),
+        ('RESUELTO', 'Problema Resuelto'),
+    ]
+    
+    dispositivo = models.ForeignKey(Dispositivo, on_delete=models.CASCADE, related_name='informes_falla')
+    administrador_creador = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='informes_creados')
+    supervisor_asignado = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='informes_asignados')
+    
+    descripcion = models.TextField(help_text="Detalles del problema detectado por el Administrador")
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='PENDIENTE')
+    
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Informe de {self.dispositivo.nombre_instalacion} - {self.get_estado_display()}"
