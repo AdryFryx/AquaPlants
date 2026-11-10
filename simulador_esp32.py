@@ -65,4 +65,4 @@ while True:
     except requests.exceptions.ConnectionError:
         print("❌ Error de red transitorio.")
 
-    time.sleep(9)
+    time.sleep(10)
