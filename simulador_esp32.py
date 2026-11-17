@@ -9,8 +9,8 @@ TOKEN_URL = f"{BASE_URL}/token/"
 DISPOSITIVO_ID = 1
 
 # 1. Pon las credenciales de tu usuario de prueba
-USUARIO = "gabriel" # O el correo exacto que usaste
-CONTRASENA = "HolaBuenas890." # Reemplaza con la contraseña real
+USUARIO = "AdryFryx" # O el correo exacto que usaste
+CONTRASENA = "12345678" # Reemplaza con la contraseña real
 
 print("Iniciando simulación del ESP32 para AquaPlants...")
 print("Obteniendo token de acceso...")
