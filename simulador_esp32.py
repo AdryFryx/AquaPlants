@@ -6,7 +6,7 @@ BASE_URL = "https://aquaplants.onrender.com/api"
 API_URL = f"{BASE_URL}/mediciones/"
 TOKEN_URL = f"{BASE_URL}/token/"
 
-DISPOSITIVO_ID = 1
+DISPOSITIVO_ID = 3
 
 # 1. Pon las credenciales de tu usuario de prueba
 USUARIO = "AdryFryx" # O el correo exacto que usaste
