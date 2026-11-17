@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/6.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
-
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -80,14 +80,11 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'neondb',
-        'USER': 'neondb_owner',
-        'PASSWORD': 'npg_LC4DYK1XQnTo',
-        'HOST': 'ep-long-bonus-b6x3ls2q-pooler.c-2.sa-east-1.aws.neon.tech',
-        'PORT': '5432',
-        'OPTIONS': {
-            'sslmode': 'require',
-        }
+        'NAME': 'postgres',  # El nombre de la base de datos
+        'USER': 'postgres',  # El usuario[cite: 8]
+        'PASSWORD': 'AquaPlants2026',  # Pon la contraseña que guardaste en el paso anterior
+        'HOST': 'db.gnjeptkjaonihagbbxxj.supabase.co',  # El host[cite: 8]
+        'PORT': '5432',  # El puerto[cite: 8]
     }
 }
 
@@ -127,9 +124,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
-STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration

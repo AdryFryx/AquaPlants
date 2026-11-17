@@ -30,7 +30,6 @@ from .models import (
 from .serializers import DispositivoSerializer, MedicionSerializer, RegistroSerializer
 from .permissions import es_administrador, es_supervisor
 
-
 # =====================================================
 # GESTION DE DISPOSITIVOS
 # =====================================================
@@ -44,7 +43,6 @@ class DispositivoViewSet(viewsets.ModelViewSet):
         if usuario.is_superuser or usuario.is_staff:
             return Dispositivo.objects.all()
         return Dispositivo.objects.filter(usuario_encargado=usuario)
-
 
 # =====================================================
 # GESTION DE MEDICIONES Y GENERACION DE ALERTAS
@@ -105,7 +103,6 @@ class MedicionViewSet(viewsets.ModelViewSet):
         except Exception as e:
             print(f'Error en el motor de alertas: {e}')
 
-
 # =====================================================
 # REGISTRO PUBLICO DE CLIENTES (API)
 # =====================================================
@@ -130,7 +127,6 @@ def registrar_usuario(request):
         }, status=status.HTTP_201_CREATED)
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 # =====================================================
 # CONFIGURACION DEL CULTIVO (API)
@@ -218,7 +214,6 @@ def actualizar_configuracion(request):
         print(f'Error en configuración: {e}')
         return Response({'error': 'No se pudo procesar la configuración.'}, status=status.HTTP_400_BAD_REQUEST)
 
-
 # =====================================================
 # GESTION DE ALERTAS (API)
 # =====================================================
@@ -248,7 +243,6 @@ def gestionar_alertas(request):
 
     return Response({'mensaje': 'Alerta resuelta exitosamente.'})
 
-
 # =====================================================
 # VISTAS WEB (DASHBOARDS)
 # =====================================================
@@ -274,7 +268,6 @@ def login_web(request):
             
     return render(request, 'api/login_web.html')
 
-
 @login_required(login_url='login_web')
 def dashboard_admin(request):
     usuario_actual = request.user
@@ -288,40 +281,46 @@ def dashboard_admin(request):
         clientes = User.objects.filter(groups__name='CLIENTE').select_related('perfil')
         dispositivos = Dispositivo.objects.all().select_related('usuario_encargado')
         supervisores = User.objects.filter(groups__name='SUPERVISOR')
+        administradores = User.objects.filter(is_superuser=True)
         
         contexto = {
             'rol': 'Administrador',
-            'clientes': clientes,
             'dispositivos': dispositivos,
+            'clientes': clientes,
             'supervisores': supervisores,
+            'administradores': administradores,
+
         }
+        return render(request, 'api/dashboard_admin.html', contexto)
         
     elif es_supervisor(usuario_actual):
         informes = InformeFalla.objects.filter(supervisor_asignado=usuario_actual, estado='PENDIENTE').select_related('dispositivo', 'dispositivo__usuario_encargado')
-        
+        informes_resueltos = InformeFalla.objects.filter(supervisor_asignado=usuario_actual, estado='RESUELTO').order_by('-fecha_resolucion')[:15]
         # Preparamos un diccionario con los datos históricos para los gráficos
         datos_graficos = {}
         for informe in informes:
-            # Traemos las últimas 15 mediciones del dispositivo afectado
             mediciones = list(Medicion.objects.filter(dispositivo=informe.dispositivo).order_by('-timestamp')[:15])
-            mediciones.reverse() # Las volteamos para que queden en orden cronológico (de más antigua a más nueva)
+            mediciones.reverse()
             
             datos_graficos[informe.id] = {
                 'etiquetas': [m.timestamp.strftime('%H:%M') for m in mediciones],
                 'temperatura': [m.temperatura if m.temperatura else 0 for m in mediciones],
                 'ph': [m.ph if m.ph else 0 for m in mediciones],
-                'agua': [m.nivel_agua if m.nivel_agua else 0 for m in mediciones]
+                'agua': [m.nivel_agua if m.nivel_agua else 0 for m in mediciones],
+                # NUEVOS DATOS: Nutrientes Hidropónicos
+                'nutriente_a': [m.nutriente_a if m.nutriente_a else 0 for m in mediciones],
+                'nutriente_b': [m.nutriente_b if m.nutriente_b else 0 for m in mediciones]
             }
 
         contexto = {
             'rol': 'Supervisor',
             'informes_pendientes': informes,
-            # Convertimos el diccionario a JSON para que JavaScript pueda leerlo fácilmente
+            'informes_resueltos': informes_resueltos,
             'datos_graficos_json': json.dumps(datos_graficos) 
         }
-
-    return render(request, 'api/dashboard_admin.html', contexto)
-
+        return render(request, 'api/dashboard_supervisor.html', contexto)
+    else:
+        return redirect('login_web')
 
 @login_required(login_url='login_web')
 @require_POST
@@ -352,100 +351,140 @@ def crear_informe_falla(request):
 
     return redirect('dashboard_admin')
 
-
 @login_required(login_url='login_web')
 @require_POST
 def crear_cliente_web(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        nombre = request.POST.get('nombre')
+        apellido = request.POST.get('apellido')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        
+        mac_address = request.POST.get('mac_address')
+        nombre_instalacion = request.POST.get('nombre_instalacion')
+
+        if User.objects.filter(username=username).exists():
+            messages.error(request, "Ese usuario ya está registrado.")
+            return redirect('dashboard_admin')
+            
+        if Dispositivo.objects.filter(mac_address=mac_address).exists():
+            messages.error(request, "Esa MAC Address ya está en uso.")
+            return redirect('dashboard_admin')
+
+        # 1. Creamos al Usuario Cliente
+        nuevo_user = User.objects.create_user(
+            username=username, 
+            email=email, 
+            password=password, 
+            first_name=nombre, 
+            last_name=apellido
+        )
+        
+        # 2. IMPORTANTE: Le asignamos el grupo CLIENTE para que aparezca en la tabla
+        grupo_cliente, _ = Group.objects.get_or_create(name='CLIENTE')
+        nuevo_user.groups.add(grupo_cliente)
+        
+        # 3. Le creamos y asignamos su Dispositivo ESP32
+        nuevo_disp = Dispositivo.objects.create(
+            mac_address=mac_address, 
+            usuario_encargado=nuevo_user, 
+            nombre_instalacion=nombre_instalacion
+        )
+        
+        # 4. Le creamos su Cultivo inicial
+        Cultivo.objects.create(
+            dispositivo=nuevo_disp, 
+            tipo_planta='Lechuga',
+            semanas_ciclo=4
+        )
+        
+        messages.success(request, f"¡Cliente {nombre} y su dispositivo {mac_address} creados con éxito!")
+        return redirect('dashboard_admin')
+        
+    return redirect('dashboard_admin')
+
+
+# =====================================================
+# NUEVO CRUD GENÉRICO PARA TODOS LOS USUARIOS
+# =====================================================
+
+@login_required(login_url='login_web')
+@require_POST
+def crear_empleado_web(request):
     if not es_administrador(request.user): 
         return redirect('dashboard_admin')
-    
-    try:
-        with transaction.atomic():
-            user = User.objects.create(
-                username=request.POST.get('username'),
-                email=request.POST.get('email'),
-                first_name=request.POST.get('nombre'),
-                last_name=request.POST.get('apellido'),
-                password=make_password(request.POST.get('password'))
-            )
-            
-            grupo, _ = Group.objects.get_or_create(name='CLIENTE')
-            user.groups.add(grupo)
-            
-            PerfilUsuario.objects.create(usuario=user, telefono=request.POST.get('telefono'))
-            
-            mac = request.POST.get('mac_address')
-            instalacion = request.POST.get('nombre_instalacion')
-            
-            if mac and instalacion:
-                dispositivo = Dispositivo.objects.create(
-                    mac_address=mac,
-                    usuario_encargado=user,
-                    nombre_instalacion=instalacion
-                )
-                Cultivo.objects.create(dispositivo=dispositivo, tipo_planta="Por definir")
 
-        messages.success(request, 'Cliente y dispositivo registrados exitosamente.')
-    except Exception as e:
-        messages.error(request, 'Error al registrar: Puede que el usuario o la MAC ya existan.')
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        nombre = request.POST.get('nombre')
+        apellido = request.POST.get('apellido')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        rol = request.POST.get('rol') # 'SUPERVISOR' o 'ADMIN'
         
+        if User.objects.filter(username=username).exists():
+            messages.error(request, "Ese usuario ya existe.")
+            return redirect('dashboard_admin')
+            
+        nuevo_user = User.objects.create_user(username=username, email=email, password=password, first_name=nombre, last_name=apellido)
+        
+        if rol == 'ADMIN':
+            nuevo_user.is_superuser = True
+            nuevo_user.is_staff = True
+            nuevo_user.save()
+        elif rol == 'SUPERVISOR':
+            grupo, _ = Group.objects.get_or_create(name='SUPERVISOR')
+            nuevo_user.groups.add(grupo)
+            
+        messages.success(request, f"¡Empleado {nombre} registrado como {rol} exitosamente!")
     return redirect('dashboard_admin')
 
 
 @login_required(login_url='login_web')
 @require_POST
-def editar_cliente_web(request):
+def editar_usuario_web(request):
     if not es_administrador(request.user): 
         return redirect('dashboard_admin')
-    
-    try:
-        cliente = User.objects.get(id=request.POST.get('cliente_id'), groups__name='CLIENTE')
-        cliente.first_name = request.POST.get('nombre')
-        cliente.last_name = request.POST.get('apellido')
-        cliente.email = request.POST.get('email')
-        cliente.save()
-        
-        perfil, _ = PerfilUsuario.objects.get_or_create(usuario=cliente)
-        perfil.telefono = request.POST.get('telefono')
-        perfil.save()
-        
-        messages.success(request, 'Datos del cliente actualizados.')
-    except Exception as e:
-        messages.error(request, 'Error al actualizar el cliente.')
-        
-    return redirect('dashboard_admin')
 
+    if request.method == 'POST':
+        user_id = request.POST.get('usuario_id')
+        user = User.objects.get(id=user_id)
+        user.first_name = request.POST.get('nombre')
+        user.last_name = request.POST.get('apellido')
+        user.email = request.POST.get('email')
+        user.save()
+        messages.success(request, f"Datos de @{user.username} actualizados.")
+    return redirect('dashboard_admin')
 
 @login_required(login_url='login_web')
 @require_POST
-def eliminar_cliente_web(request):
+def eliminar_usuario_web(request):
     if not es_administrador(request.user): 
         return redirect('dashboard_admin')
-    
-    try:
-        cliente = User.objects.get(id=request.POST.get('cliente_id'), groups__name='CLIENTE')
-        cliente.delete()
-        messages.success(request, 'Cliente eliminado completamente del sistema.')
-    except Exception as e:
-        messages.error(request, 'Error al intentar eliminar al cliente.')
-        
-    return redirect('dashboard_admin')
 
+    if request.method == 'POST':
+        user_id = request.POST.get('usuario_id')
+        user = User.objects.get(id=user_id)
+        nombre = user.username
+        user.delete() # Esto borra al usuario y sus dispositivos asociados automáticamente
+        messages.success(request, f"El usuario @{nombre} fue eliminado del sistema.")
+    return redirect('dashboard_admin')
 
 @login_required(login_url='login_web')
 @require_POST
 def resolver_informe(request):
-    if not es_supervisor(request.user):
-        return redirect('dashboard_admin')
+    if request.method == 'POST':
+        informe_id = request.POST.get('informe_id')
+        comentario = request.POST.get('comentario', 'Resuelto sin comentarios adicionales.')
         
-    informe_id = request.POST.get('informe_id')
-    try:
-        informe = InformeFalla.objects.get(id=informe_id, supervisor_asignado=request.user)
+        informe = InformeFalla.objects.get(id=informe_id)
         informe.estado = 'RESUELTO'
+        informe.comentario_resolucion = comentario
+        informe.fecha_resolucion = timezone.now() # Guarda la fecha y hora actual
         informe.save()
-        messages.success(request, '¡Problema marcado como resuelto!')
-    except InformeFalla.DoesNotExist:
-        messages.error(request, 'No se pudo actualizar el informe.')
+        
+        messages.success(request, f"¡Ticket cerrado exitosamente con tu feedback guardado!")
         
     return redirect('dashboard_admin')
 
@@ -474,3 +513,49 @@ def logout_web(request):
     auth_logout(request) # Esto destruye la sesión y la cookie
     messages.success(request, 'Has cerrado sesión exitosamente.')
     return redirect('login_web')
+
+def configurar_torre_web(request):
+    if request.method == 'POST':
+        dispositivo_id = request.POST.get('dispositivo_id')
+        latitud = request.POST.get('latitud')
+        longitud = request.POST.get('longitud')
+        tipo_planta = request.POST.get('tipo_planta')
+        semanas_ciclo = request.POST.get('semanas_ciclo')
+
+        # Buscar el dispositivo
+        dispositivo = Dispositivo.objects.get(id=dispositivo_id)
+        
+        # Guardar GPS (si el usuario dejó el campo vacío, lo guardamos como None)
+        dispositivo.latitud = float(latitud) if latitud else None
+        dispositivo.longitud = float(longitud) if longitud else None
+        dispositivo.save()
+
+        # Buscar el cultivo asociado y actualizar sus parámetros hidropónicos
+        if hasattr(dispositivo, 'cultivo_activo'):
+            cultivo = dispositivo.cultivo_activo
+            cultivo.tipo_planta = tipo_planta
+            cultivo.semanas_ciclo = int(semanas_ciclo)
+            cultivo.save()
+
+        messages.success(request, f"Configuración de {dispositivo.nombre_instalacion} actualizada exitosamente.")
+    
+    return redirect('dashboard_admin')
+
+@login_required(login_url='login_web')
+@require_POST
+def eliminar_dispositivo_web(request):
+    if not es_administrador(request.user): 
+        return redirect('dashboard_admin')
+
+    if request.method == 'POST':
+        dispositivo_id = request.POST.get('dispositivo_id')
+        try:
+            dispositivo = Dispositivo.objects.get(id=dispositivo_id)
+            mac = dispositivo.mac_address
+            # Django borrará automáticamente en cascada el Cultivo y las Mediciones de este dispositivo
+            dispositivo.delete()
+            messages.success(request, f"La torre con MAC {mac} y todo su historial fueron eliminados correctamente.")
+        except Dispositivo.DoesNotExist:
+            messages.error(request, "Error: El dispositivo no existe.")
+            
+    return redirect('dashboard_admin')
