@@ -80,14 +80,13 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'postgres',  # El nombre de la base de datos
-        'USER': 'postgres',  # El usuario[cite: 8]
-        'PASSWORD': 'AquaPlants2026',  # Pon la contraseña que guardaste en el paso anterior
-        'HOST': 'db.gnjeptkjaonihagbbxxj.supabase.co',  # El host[cite: 8]
-        'PORT': '5432',  # El puerto[cite: 8]
+        'NAME': 'postgres',
+        'USER': 'postgres.gnjeptkjaonihagbbxxj',
+        'PASSWORD': 'AquaPlants2026',
+        'HOST': 'aws-0-us-east-1.pooler.supabase.com',
+        'PORT': '6543',
     }
 }
-
 
 
 # Password validation
