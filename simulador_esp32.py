@@ -1,68 +1,37 @@
-import time
-import random
 import requests
+import random
+import time
 
-BASE_URL = "https://aquaplants.onrender.com/api"
-API_URL = f"{BASE_URL}/mediciones/"
-TOKEN_URL = f"{BASE_URL}/token/"
+URL = "https://aquaplants.onrender.com/datos-esp32/"  # Cambia a tu URL local si estás en pruebas
 
-DISPOSITIVO_ID = 3
+# Puedes cambiar esta MAC por la de cualquier cliente registrado en el sistema
+MAC_ADDRESS = "00:1B:44:11:3A:B7" 
 
-# 1. Pon las credenciales de tu usuario de prueba
-USUARIO = "AdryFryx" # O el correo exacto que usaste
-CONTRASENA = "12345678" # Reemplaza con la contraseña real
-
-print("Iniciando simulación del ESP32 para AquaPlants...")
-print("Obteniendo token de acceso...")
-
-# 2. Hacemos login para obtener el JWT Token
-try:
-    login_response = requests.post(TOKEN_URL, json={"username": USUARIO, "password": CONTRASENA})
-    if login_response.status_code == 200:
-        access_token = login_response.json().get('access')
-        print("✅ Token obtenido exitosamente.\n")
-    else:
-        print(f"❌ Error al iniciar sesión: {login_response.text}")
-        exit() # Detiene el script si las credenciales están mal
-except requests.exceptions.ConnectionError:
-    print("❌ Error de conexión con Render.")
-    exit()
-
-# 3. Guardamos el token en los headers para los envíos
 headers = {
-    "Authorization": f"Bearer {access_token}",
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
+    "X-API-KEY": "AQUAPLANTS_IOT_SECRET_2026" # La llave de seguridad estática
 }
 
-print("Presiona Ctrl+C para detener el envío de datos.\n")
+print(f"Iniciando simulador para torre con MAC: {MAC_ADDRESS}")
 
 while True:
-    temperatura = round(random.uniform(20.0, 26.0), 1)
-    ph = round(random.uniform(5.5, 6.5), 1)
-    nivel_agua = round(random.uniform(70.0, 100.0), 1)
-
     payload = {
-        "dispositivo": DISPOSITIVO_ID,
-        "temperatura": temperatura,
-        "ph": ph,
-        "nivel_agua": nivel_agua
+        "mac_address": MAC_ADDRESS,
+        "temperatura": round(random.uniform(18.0, 30.0), 1),
+        "ph": round(random.uniform(5.5, 7.5), 1),
+        "nivel_agua": round(random.uniform(20.0, 100.0), 1),
+        "nutriente_a": round(random.uniform(1.0, 5.0), 1),
+        "nutriente_b": round(random.uniform(1.0, 5.0), 1)
     }
 
     try:
-        # Agregamos timeout=10 (espera máximo 10 segundos antes de rendirse y seguir)
-        respuesta = requests.post(API_URL, json=payload, headers=headers, timeout=10)
-        
-        if respuesta.status_code == 201:
-            print(f"✅ Enviado -> Temp: {temperatura}°C | pH: {ph} | Agua: {nivel_agua}%")
-        elif respuesta.status_code == 401:
-            print("⚠️ El token expiró por seguridad. Cancela el script (Ctrl+C) y vuélvelo a ejecutar.")
-            break
+        response = requests.post(URL, json=payload, headers=headers)
+        if response.status_code == 201:
+            print(f"[OK] Datos enviados: Temp {payload['temperatura']}°C, pH {payload['ph']}")
         else:
-            print(f"⚠️ Error al enviar: {respuesta.status_code} - {respuesta.text}")
-            
-    except requests.exceptions.Timeout:
-        print("⏳ Render tardó demasiado en responder. Saltando al siguiente intento...")
-    except requests.exceptions.ConnectionError:
-        print("❌ Error de red transitorio.")
+            print(f"[ERROR] {response.status_code}: {response.json()}")
+    except Exception as e:
+        print(f"[ERROR DE CONEXIÓN] {e}")
 
-    time.sleep(10)
+    # Esperar 5 minutos (300 segundos) para el siguiente envío
+    time.sleep(300)

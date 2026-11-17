@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:aquaplants/services/api_service.dart';
+import '../services/api_service.dart';
 
 class AnaliticaScreen extends StatefulWidget {
   const AnaliticaScreen({super.key});
@@ -9,16 +9,61 @@ class AnaliticaScreen extends StatefulWidget {
 }
 
 class _AnaliticaScreenState extends State<AnaliticaScreen> {
-  int _diasSeleccionados = 7; // Por defecto 1 semana
   String _tituloPeriodo = 'Resumen Semanal';
+  bool _isLoading = true;
 
-  // Función para abrir el menú de selección de fechas
+  // Variables dinámicas para los promedios
+  String _promedioTemp = '--';
+  String _promedioAgua = '--';
+  String _promedioPh = '--';
+  String _promedioNutA = '--';
+  String _promedioNutB = '--';
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarAnaliticas(7); // Carga inicial de 7 días
+  }
+
+  Future<void> _cargarAnaliticas(int dias) async {
+    setState(() => _isLoading = true);
+    
+    final datos = await ApiService().getMediciones(dias: dias);
+    
+    if (datos.isNotEmpty && mounted) {
+      double sumTemp = 0, sumAgua = 0, sumPh = 0, sumNutA = 0, sumNutB = 0;
+      
+      for (var m in datos) {
+        sumTemp += (m['temperatura'] as num?)?.toDouble() ?? 0.0;
+        sumAgua += (m['nivel_agua'] as num?)?.toDouble() ?? 0.0;
+        sumPh += (m['ph'] as num?)?.toDouble() ?? 0.0;
+        sumNutA += (m['nutriente_a'] as num?)?.toDouble() ?? 0.0;
+        sumNutB += (m['nutriente_b'] as num?)?.toDouble() ?? 0.0;
+      }
+
+      int total = datos.length;
+
+      setState(() {
+        _promedioTemp = '${(sumTemp / total).toStringAsFixed(1)}°C';
+        _promedioAgua = '${(sumAgua / total).toStringAsFixed(1)}%';
+        _promedioPh = (sumPh / total).toStringAsFixed(1);
+        _promedioNutA = '${(sumNutA / total).toStringAsFixed(1)} ml/L';
+        _promedioNutB = '${(sumNutB / total).toStringAsFixed(1)} ml/L';
+        _isLoading = false;
+      });
+    } else if (mounted) {
+      setState(() {
+        _promedioTemp = '--'; _promedioAgua = '--'; _promedioPh = '--';
+        _promedioNutA = '--'; _promedioNutB = '--';
+        _isLoading = false;
+      });
+    }
+  }
+
   void _mostrarFiltroFechas() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
         return SafeArea(
           child: Column(
@@ -31,17 +76,12 @@ class _AnaliticaScreenState extends State<AnaliticaScreen> {
               ListTile(
                 leading: const Icon(Icons.history_toggle_off),
                 title: const Text('Últimos 3 días'),
-                onTap: () => _aplicarFiltro(3, 'Resumen: Últimos 3 días'),
+                onTap: () { Navigator.pop(context); _aplicarFiltro(3, 'Resumen: Últimos 3 días'); },
               ),
               ListTile(
                 leading: const Icon(Icons.calendar_view_week),
                 title: const Text('Última semana'),
-                onTap: () => _aplicarFiltro(7, 'Resumen Semanal'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.calendar_month),
-                title: const Text('Último mes'),
-                onTap: () => _aplicarFiltro(30, 'Resumen Mensual'),
+                onTap: () { Navigator.pop(context); _aplicarFiltro(7, 'Resumen Semanal'); },
               ),
             ],
           ),
@@ -52,15 +92,9 @@ class _AnaliticaScreenState extends State<AnaliticaScreen> {
 
   void _aplicarFiltro(int dias, String titulo) {
     setState(() {
-      _diasSeleccionados = dias;
       _tituloPeriodo = titulo;
     });
-    Navigator.pop(context); // Cierra el modal
-    
-    
-    ApiService().getMediciones(dias: _diasSeleccionados).then((datos) {
-    setState(() {});
-    });
+    _cargarAnaliticas(dias);
   }
 
   @override
@@ -74,48 +108,51 @@ class _AnaliticaScreenState extends State<AnaliticaScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_month, color: Colors.white),
-            onPressed: _mostrarFiltroFechas, // Conectamos el botón al modal
+            onPressed: _mostrarFiltroFechas,
           )
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // El texto ahora cambia dinámicamente según el filtro
-            Text(_tituloPeriodo, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
-            const SizedBox(height: 16),
-            Row(
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: _buildStatCard('Temp. Promedio', '23.4°C', Icons.thermostat, Colors.orange)),
-                const SizedBox(width: 12),
-                Expanded(child: _buildStatCard('Consumo Agua', '45 L', Icons.water_drop, Colors.blue)),
+                Text(_tituloPeriodo, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
+                const SizedBox(height: 16),
+                
+                // Fila 1
+                Row(
+                  children: [
+                    Expanded(child: _buildStatCard('Temp. Promedio', _promedioTemp, Icons.thermostat, Colors.orange)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildStatCard('Agua Promedio', _promedioAgua, Icons.water_drop, Colors.blue)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                
+                // Fila 2
+                Row(
+                  children: [
+                    Expanded(child: _buildStatCard('pH Promedio', _promedioPh, Icons.science, Colors.purple)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildStatCard('Nutriente A (Prom)', _promedioNutA, Icons.opacity, Colors.teal)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                
+                // Fila 3
+                Row(
+                  children: [
+                    Expanded(child: _buildStatCard('Nutriente B (Prom)', _promedioNutB, Icons.bubble_chart, Colors.deepPurple)),
+                    const SizedBox(width: 12),
+                    Expanded(child: Container()), // Espacio vacío para balancear
+                  ],
+                ),
               ],
             ),
-            const SizedBox(height: 24),
-            
-            // UI original restaurada completa
-            const Text('Estabilidad del Sistema', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF004D40))),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Column(
-                children: [
-                  Icon(Icons.eco, size: 60, color: Colors.green),
-                  SizedBox(height: 16),
-                  Text('Salud Óptima', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green)),
-                  Text('Tu cultivo de Lechugas se ha mantenido dentro de los umbrales el 92% del tiempo esta semana.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 

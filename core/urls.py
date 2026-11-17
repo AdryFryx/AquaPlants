@@ -3,7 +3,20 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import (TokenObtainPairView,TokenRefreshView)
 from api.views import (DispositivoViewSet,MedicionViewSet,actualizar_configuracion,gestionar_alertas,registrar_usuario)
-from api.views import login_web, dashboard_admin, crear_informe_falla, crear_cliente_web, resolver_informe, cambiar_estado_dispositivo, logout_web, configurar_torre_web, crear_empleado_web, editar_usuario_web,eliminar_usuario_web, eliminar_dispositivo_web
+from api.views import (
+    login_web,
+    dashboard_admin,
+    crear_informe_falla,
+    crear_cliente_web,
+    resolver_informe,
+    cambiar_estado_dispositivo,
+    logout_web,
+    configurar_torre_web,
+    crear_empleado_web,
+    editar_usuario_web,
+    eliminar_usuario_web,
+    eliminar_dispositivo_web,
+    recibir_datos_esp32,)
 
 # ENRUTADOR DE LA API
 router = DefaultRouter()
@@ -36,4 +49,5 @@ urlpatterns = [
     path('logout-admin/', logout_web, name='logout_web'),
     path('config-torre/', configurar_torre_web, name='configurar_torre_web'),
     path('eliminar-dispositivo/', eliminar_dispositivo_web, name='eliminar_dispositivo_web'),
+    path('datos-esp32/', recibir_datos_esp32, name='recibir_datos_esp32'),
 ]

@@ -149,7 +149,12 @@ def actualizar_configuracion(request):
                 regla.variable: {'minimo': regla.rango_minimo, 'maximo': regla.rango_maximo}
                 for regla in cultivo.reglas.all()
             }
-            return Response({'tipo_planta': cultivo.tipo_planta, 'reglas': reglas})
+            return Response({
+                'usuario_nombre': f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username,
+                'torre_nombre': dispositivo.nombre_instalacion,
+                'tipo_planta': cultivo.tipo_planta,
+                'reglas': reglas
+            })
 
         tipo_planta = request.data.get('tipo_planta')
         if tipo_planta is not None:
@@ -559,3 +564,56 @@ def eliminar_dispositivo_web(request):
             messages.error(request, "Error: El dispositivo no existe.")
             
     return redirect('dashboard_admin')
+
+@api_view(['POST'])
+@permission_classes([AllowAny]) # Permite acceso sin cuenta de usuario
+def recibir_datos_esp32(request):
+    # 1. Validación de seguridad básica (API Key)
+    api_key = request.headers.get('X-API-KEY')
+    if api_key != "AQUAPLANTS_IOT_SECRET_2026":
+        return Response({'error': 'No autorizado. API Key incorrecta.'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+    # 2. Identificar el dispositivo automáticamente por su MAC
+    mac = request.data.get('mac_address')
+    if not mac:
+        return Response({'error': 'Falta la mac_address en los datos.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    try:
+        dispositivo = Dispositivo.objects.get(mac_address=mac)
+    except Dispositivo.DoesNotExist:
+        return Response({'error': f'Dispositivo con MAC {mac} no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        
+    # 3. Guardar la medición asociándola al dispositivo detectado
+    medicion = Medicion.objects.create(
+        dispositivo=dispositivo,
+        temperatura=request.data.get('temperatura'),
+        ph=request.data.get('ph'),
+        nivel_agua=request.data.get('nivel_agua'),
+        nutriente_a=request.data.get('nutriente_a'),
+        nutriente_b=request.data.get('nutriente_b')
+    )
+    
+    # 4. Motor de alertas automáticas
+    try:
+        cultivo = getattr(dispositivo, 'cultivo_activo', None)
+        if cultivo:
+            variables = {
+                'TEMP': ('temperatura', 'Temperatura', '°C'),
+                'PH': ('ph', 'pH', ''),
+                'AGUA': ('nivel_agua', 'Nivel de agua', ''),
+            }
+            for variable, datos in variables.items():
+                campo, nombre, unidad = datos
+                valor = getattr(medicion, campo)
+                if valor is None: continue
+                
+                regla = cultivo.reglas.filter(variable=variable).first()
+                if regla and (valor < regla.rango_minimo or valor > regla.rango_maximo):
+                    AlertaGenerada.objects.create(
+                        medicion=medicion,
+                        mensaje=f'ALERTA: {nombre} fuera del rango permitido. Valor: {valor}{unidad}.'
+                    )
+    except Exception as e:
+        print(f'Error en motor de alertas IoT: {e}')
+        
+    return Response({'mensaje': 'Datos guardados correctamente'}, status=status.HTTP_201_CREATED)
