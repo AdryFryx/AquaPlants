@@ -30,7 +30,7 @@ class Dispositivo(models.Model):
         return f"{self.nombre_instalacion} - {self.mac_address}"
 
 class Cultivo(models.Model):
-    dispositivo = models.OneToOneField(Dispositivo, on_delete=models.CASCADE, related_name='cultivo_activo')
+    dispositivo = models.ForeignKey(Dispositivo, on_delete=models.CASCADE, related_name='cultivos')
     tipo_planta = models.CharField(max_length=100)
     fecha_inicio = models.DateField(auto_now_add=True)
     activo = models.BooleanField(default=True)
@@ -44,6 +44,8 @@ class ReglaUmbral(models.Model):
         ('TEMP', 'Temperatura'),
         ('PH', 'Nivel de pH'),
         ('AGUA', 'Nivel de Agua'),
+        ('NUT_A', 'Nutriente A'),
+        ('NUT_B', 'Nutriente B'),
     ]
     cultivo = models.ForeignKey(Cultivo, on_delete=models.CASCADE, related_name='reglas')
     variable = models.CharField(max_length=10, choices=VARIABLE_CHOICES)
@@ -84,16 +86,18 @@ class AlertaGenerada(models.Model):
 # =====================================================
 class InformeFalla(models.Model):
     ESTADOS = [
+        ('POR_ASIGNAR', 'Reportado por Cliente (Por Asignar)'),
         ('PENDIENTE', 'Pendiente de Revisión'),
         ('REVISION', 'En Revisión por Supervisor'),
         ('RESUELTO', 'Problema Resuelto'),
     ]
     
     dispositivo = models.ForeignKey(Dispositivo, on_delete=models.CASCADE, related_name='informes_falla')
-    administrador_creador = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='informes_creados')
+    administrador_creador = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='informes_creados')
     supervisor_asignado = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='informes_asignados')
     
-    descripcion = models.TextField(help_text="Detalles del problema detectado por el Administrador")
+    reporte_cliente = models.TextField(null=True, blank=True, help_text="Motivo o descripción enviada por el cliente desde la app")
+    descripcion = models.TextField(blank=True, default='', help_text="Detalles técnicos agregados por el Administrador")
     estado = models.CharField(max_length=20, choices=ESTADOS, default='PENDIENTE')
     
     fecha_creacion = models.DateTimeField(auto_now_add=True)

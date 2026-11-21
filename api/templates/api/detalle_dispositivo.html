@@ -1,0 +1,334 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoreo: {{ disp.nombre_instalacion }} - AquaPlants</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-light">
+
+    <!-- Barra de navegación -->
+    <nav class="navbar navbar-expand-lg navbar-dark shadow-sm" style="background-color: #004D40;">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="{% url 'dashboard_admin' %}">
+                <img src="{% static 'img/logo.png' %}" alt="Logo AquaPlants" height="35" class="me-2 rounded">
+                Panel de {{ rol }}
+            </a>
+            <div class="d-flex text-white align-items-center">
+                <a href="{% url 'dashboard_admin' %}" class="btn btn-sm btn-outline-light me-3">
+                    <i class="bi bi-arrow-left"></i> Volver al Panel
+                </a>
+                <span class="me-3"><i class="bi bi-person-circle"></i> {{ request.user.username }}</span>
+                <a href="{% url 'logout_web' %}" class="btn btn-sm btn-outline-light">Cerrar Sesión</a>
+            </div>
+        </div>
+    </nav>
+
+        
+    <!-- Gestión de Plantaciones Asociadas -->
+        <div class="card shadow-sm border-0 mb-4">
+            {% if es_admin %}
+            <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <h6 class="fw-bold text-success mb-2">
+                        <i class="bi bi-flower1"></i> Plantaciones asignadas a esta torre
+                    </h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for cult in disp.cultivos.all %}
+                            <span class="badge bg-success-subtle text-success border border-success d-inline-flex align-items-center gap-2 px-3 py-2">
+                                {{ cult.tipo_planta }} ({{ cult.semanas_ciclo }} sem)
+                                <form action="{% url 'eliminar_cultivo_web' %}" method="POST" class="m-0 d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="cultivo_id" value="{{ cult.id }}">
+                                    <button type="submit" class="btn-close" style="font-size: 0.65rem;" title="Quitar plantación"></button>
+                                </form>
+                            </span>
+                        {% empty %}
+                            <span class="text-muted small">Esta torre aún no tiene plantaciones asignadas.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                   
+                <form action="{% url 'agregar_cultivo_web' %}" method="POST" class="d-flex gap-2 align-items-center">
+                    {% csrf_token %}
+                    <input type="hidden" name="dispositivo_id" value="{{ disp.id }}">
+                    <select name="tipo_planta" class="form-select form-select-sm" required>
+                        <option value="" disabled selected>Elegir planta...</option>
+                        {% for planta in plantas_disponibles %}
+                            <option value="{{ planta }}">{{ planta }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-success fw-bold text-nowrap">
+                        <i class="bi bi-plus-circle"></i> Asignar
+                    </button>
+                </form>
+            </div>
+            {% endif %} 
+        </div>
+
+
+    <div class="container mt-4 mb-5">
+        <!-- Encabezado con info del dispositivo, cliente y acciones -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <h3 class="text-success fw-bold mb-1">
+                        <i class="bi bi-cpu"></i> {{ disp.nombre_instalacion }}
+                    </h3>
+                    <p class="mb-1 text-muted">
+                        <strong>MAC:</strong> <span class="badge bg-secondary">{{ disp.mac_address }}</span> |
+                        <strong>Cliente:</strong> {{ disp.usuario_encargado.first_name }} {{ disp.usuario_encargado.last_name }} (@{{ disp.usuario_encargado.username }})
+                        {% if disp.usuario_encargado.email %} — {{ disp.usuario_encargado.email }}{% endif %}
+                    </p>
+                    <small class="text-muted">
+                        <i class="bi bi-arrow-repeat"></i> Actualización automática cada 10s · Última lectura: <span id="ultima-actualizacion" class="fw-bold">--:--:--</span>
+                    </small>
+                </div>
+        {% if es_admin %}        
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <!-- Botón Conexión / Desconexión -->
+                    <form action="{% url 'cambiar_estado_dispositivo' %}" method="POST" class="m-0">
+                        {% csrf_token %}
+                        <input type="hidden" name="dispositivo_id" value="{{ disp.id }}">
+                        {% if disp.estado_conexion %}
+                            <button type="submit" class="btn btn-success fw-bold">
+                                <i class="bi bi-wifi"></i> En línea (Desconectar)
+                            </button>
+                        {% else %}
+                            <button type="submit" class="btn btn-danger fw-bold">
+                                <i class="bi bi-wifi-off"></i> Desconectado (Conectar)
+                            </button>
+                        {% endif %}
+                    </form>
+
+                    <!-- Botón Reportar Falla -->
+                    <button type="button" class="btn btn-warning fw-bold text-dark" data-bs-toggle="modal" data-bs-target="#modalFallaDetalle">
+                        <i class="bi bi-exclamation-triangle"></i> Reportar Falla
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Selector de Plantación para las Gráficas -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div class="d-flex flex-wrap align-items-center gap-2" id="selector-plantaciones">
+                <!-- Los botones de cada plantación se generan dinámicamente con JS -->
+            </div>
+            <span id="badge-planta-activa" class="badge bg-success fs-6 d-none"></span>
+        </div>
+
+        <!-- Cuadrícula de las 5 Gráficas en Tiempo Real -->
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h6 class="fw-bold text-warning mb-3"><i class="bi bi-thermometer-half"></i> Temperatura (°C)</h6>
+                        <canvas id="chartTemp" height="160"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h6 class="fw-bold text-primary mb-3"><i class="bi bi-droplet-fill"></i> Nivel de Agua (%)</h6>
+                        <canvas id="chartAgua" height="160"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h6 class="fw-bold" style="color: #6f42c1;"><i class="bi bi-flask"></i> Nivel de pH</h6>
+                        <canvas id="chartPh" height="160"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h6 class="fw-bold" style="color: #00897B;"><i class="bi bi-moisture"></i> Nutriente A (ml/L)</h6>
+                        <canvas id="chartNutA" height="160"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 mx-auto">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h6 class="fw-bold" style="color: #5E35B1"><i class="bi bi-moisture"></i> Nutriente B (ml/L)</h6>
+                        <canvas id="chartNutB" height="160"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Reportar Falla -->
+    <div class="modal fade" id="modalFallaDetalle" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content text-start">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title fw-bold text-dark"><i class="bi bi-tools"></i> Nuevo Informe de Falla</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="{% url 'crear_informe' %}" method="POST">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <p><strong>Dispositivo:</strong> {{ disp.nombre_instalacion }} ({{ disp.mac_address }})</p>
+                        <input type="hidden" name="dispositivo_id" value="{{ disp.id }}">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Asignar a Supervisor:</label>
+                            <select name="supervisor_id" class="form-select" required>
+                                <option value="" disabled selected>Selecciona un supervisor...</option>
+                                {% for sup in supervisores %}
+                                    <option value="{{ sup.id }}">{{ sup.first_name }} {{ sup.last_name }} (@{{ sup.username }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Descripción del problema:</label>
+                            <textarea name="descripcion" class="form-control" rows="3" required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary text-dark fw-bold" style="background-color: #00BFA5; border: none;">Enviar Informe</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const urlRealtime = "{% url 'datos_dispositivo_realtime' disp.id %}";
+        const cultivosData = JSON.parse('{{ cultivos_json|escapejs }}');
+        let cultivoActivo = cultivosData.length > 0 ? cultivosData[0] : null;
+        let ultimosDatos = null;
+
+        function crearGrafica(canvasId, label, color) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: label,
+                            data: [],
+                            borderColor: color,
+                            backgroundColor: color + '25',
+                            borderWidth: 3,
+                            tension: 0.35,
+                            fill: true,
+                            pointRadius: 4
+                        },
+                        {
+                            label: 'Mín. Ideal',
+                            data: [],
+                            borderColor: '#198754',
+                            borderWidth: 1.5,
+                            borderDash: [6, 6],
+                            pointRadius: 0,
+                            fill: false
+                        },
+                        {
+                            label: 'Máx. Ideal',
+                            data: [],
+                            borderColor: '#dc3545',
+                            borderWidth: 1.5,
+                            borderDash: [6, 6],
+                            pointRadius: 0,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    animation: { duration: 300 },
+                    scales: { y: { beginAtZero: false } }
+                }
+            });
+        }
+
+        const chartTemp = crearGrafica('chartTemp', 'Temperatura (°C)', '#FB8C00');
+        const chartAgua = crearGrafica('chartAgua', 'Agua (%)', '#1E88E5');
+        const chartPh   = crearGrafica('chartPh', 'pH', '#8E24AA');
+        const chartNutA = crearGrafica('chartNutA', 'Nutriente A (ml/L)', '#00897B');
+        const chartNutB = crearGrafica('chartNutB', 'Nutriente B (ml/L)', '#5E35B1');
+
+        function renderizarSelectorPlantaciones() {
+            const contenedor = document.getElementById('selector-plantaciones');
+            const badgeActiva = document.getElementById('badge-planta-activa');
+            contenedor.innerHTML = '';
+
+            if (cultivosData.length === 0) {
+                badgeActiva.classList.add('d-none');
+                return;
+            }
+
+            cultivosData.forEach(cultivo => {
+                const btn = document.createElement('button');
+                const esActivo = cultivoActivo && cultivoActivo.id === cultivo.id;
+                btn.type = 'button';
+                btn.className = esActivo
+                    ? 'btn btn-success fw-bold btn-sm'
+                    : 'btn btn-outline-success fw-bold btn-sm';
+                btn.innerHTML = `<i class="bi bi-flower1 me-1"></i>${cultivo.tipo_planta}`;
+                btn.onclick = () => {
+                    cultivoActivo = cultivo;
+                    renderizarSelectorPlantaciones();
+                    if (ultimosDatos) pintarTodasLasGraficas(ultimosDatos);
+                };
+                contenedor.appendChild(btn);
+            });
+
+            badgeActiva.textContent = `Viendo umbrales de: ${cultivoActivo.tipo_planta} (${cultivoActivo.semanas_ciclo} sem)`;
+            badgeActiva.classList.remove('d-none');
+        }
+
+        function actualizarGrafica(chart, labels, valores, claveRegla) {
+            const regla = cultivoActivo && cultivoActivo.reglas ? cultivoActivo.reglas[claveRegla] : null;
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = valores;
+            chart.data.datasets[1].data = regla ? labels.map(() => regla.min) : [];
+            chart.data.datasets[2].data = regla ? labels.map(() => regla.max) : [];
+            chart.update();
+        }
+
+        function pintarTodasLasGraficas(data) {
+            actualizarGrafica(chartTemp, data.etiquetas, data.temperatura, 'TEMP');
+            actualizarGrafica(chartAgua, data.etiquetas, data.agua, 'AGUA');
+            actualizarGrafica(chartPh,   data.etiquetas, data.ph, 'PH');
+            actualizarGrafica(chartNutA, data.etiquetas, data.nutriente_a, 'NUT_A');
+            actualizarGrafica(chartNutB, data.etiquetas, data.nutriente_b, 'NUT_B');
+        }
+
+        async function cargarDatosTiempoReal() {
+            try {
+                const resp = await fetch(urlRealtime);
+                if (!resp.ok) return;
+                ultimosDatos = await resp.json();
+                pintarTodasLasGraficas(ultimosDatos);
+
+                const ahora = new Date();
+                document.getElementById('ultima-actualizacion').textContent = ahora.toLocaleTimeString();
+            } catch (err) {
+                console.error('Error actualizando gráficas:', err);
+            }
+        }
+
+        renderizarSelectorPlantaciones();
+        cargarDatosTiempoReal();
+        setInterval(cargarDatosTiempoReal, 10000);
+    </script>
+</body>
+</html>

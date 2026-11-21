@@ -1,18 +1,49 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../main.dart'; // Para poder volver al Login
+import '../main.dart';
 import 'configuracion_cultivo.dart';
 
-class PerfilScreen extends StatelessWidget {
+class PerfilScreen extends StatefulWidget {
   const PerfilScreen({super.key});
+
+  @override
+  State<PerfilScreen> createState() => _PerfilScreenState();
+}
+
+class _PerfilScreenState extends State<PerfilScreen> {
+  String _nombreUsuario = '';
+  String _nombreTorre = '';
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarDatosPerfil();
+  }
+
+  Future<void> _cargarDatosPerfil() async {
+    final data = await ApiService().obtenerConfiguracion();
+
+    if (mounted) {
+      setState(() {
+        if (data != null) {
+          _nombreUsuario = data['usuario_nombre'] ?? 'Sin nombre';
+          _nombreTorre = data['torre_nombre'] ?? 'Sin torre asignada';
+        } else {
+          _nombreUsuario = 'Error al cargar';
+          _nombreTorre = 'Revisa tu conexión';
+        }
+        _isLoading = false;
+      });
+    }
+  }
 
   void _cerrarSesion(BuildContext context) async {
     final apiService = ApiService();
-    await apiService.logout(); // Borra el JWT de la memoria del teléfono
-    
+    await apiService.logout();
+
     if (!context.mounted) return;
-    
-    // Destruye todo el historial de navegación y vuelve al Login
+
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const AquaPlantsApp()),
@@ -39,8 +70,14 @@ class PerfilScreen extends StatelessWidget {
               child: Icon(Icons.person, size: 50, color: Colors.white),
             ),
             const SizedBox(height: 16),
-            const Text('Administrador', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const Text('Torre Simulada 1', style: TextStyle(color: Colors.grey)),
+            _isLoading
+                ? const CircularProgressIndicator(color: Color(0xFF00BFA5))
+                : Column(
+                    children: [
+                      Text(_nombreUsuario, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      Text(_nombreTorre, style: const TextStyle(color: Colors.grey)),
+                    ],
+                  ),
             const SizedBox(height: 40),
             ListTile(
               leading: const Icon(Icons.settings, color: Color(0xFF00BFA5)),
