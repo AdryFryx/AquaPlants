@@ -94,7 +94,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         List<FlSpot> spotsPh = [];
         List<FlSpot> spotsNutA = [];
         List<FlSpot> spotsNutB = [];
-
         for (int i = 0; i < ultimos7.length; i++) {
           spotsTemp.add(FlSpot(i.toDouble(), (ultimos7[i]['temperatura'] as num?)?.toDouble() ?? 0.0));
           spotsAgua.add(FlSpot(i.toDouble(), (ultimos7[i]['nivel_agua'] as num?)?.toDouble() ?? 0.0));
@@ -270,6 +269,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF004D40)),
             ),
             const SizedBox(height: 16),
+            
+            // CARRUSEL DE GRÁFICOS
             Container(
               height: 320,
               padding: const EdgeInsets.only(top: 16, left: 16, right: 16, bottom: 8),

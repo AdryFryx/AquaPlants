@@ -1,6 +1,6 @@
-import time
-import random
 import requests
+import random
+import time
 
 # Usa esta URL https://aquaplants.onrender.com/datos-esp32/ para producción en Render (o cambia a http://127.0.0.1:8000/datos-esp32/ para pruebas locales)
 API_URL = "http://127.0.0.1:8000/datos-esp32/"
@@ -48,4 +48,5 @@ while True:
     except requests.exceptions.ConnectionError:
         print("❌ Error de red transitorio.")
 
-    time.sleep(10)
+    # Esperar 5 minutos (300 segundos) para el siguiente envío
+    time.sleep(300)
