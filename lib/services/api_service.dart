@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  final String baseUrl = 'https://aquaplants.onrender.com/api';
+  final String baseUrl = 'http://127.0.0.1:8000/api'; //nube (https://aquaplants.onrender.com/api) || local(http://127.0.0.1:8000/api)
 
   // Obtener token JWT
   Future<String?> _getToken() async {
@@ -42,34 +42,30 @@ class ApiService {
   }
 
   // OBTENER MEDICIONES
-  Future<List<dynamic>> getMediciones({int? dias}) async {
+  Future<List<dynamic>> getMediciones({int? dias, int? dispositivoId}) async {
     try {
       final token = await _getToken();
-
       if (token == null) return [];
 
-      String url = '$baseUrl/mediciones/';
+      final params = <String, String>{};
+      if (dias != null) params['dias'] = dias.toString();
+      if (dispositivoId != null) params['dispositivo_id'] = dispositivoId.toString();
 
-      if (dias != null) {
-        url += '?dias=$dias';
-      }
+      final uri = Uri.parse('$baseUrl/mediciones/').replace(
+        queryParameters: params.isNotEmpty ? params : null,
+      );
 
       final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+        uri,
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       }
-
-      print('Error del servidor: ${response.statusCode}');
       return [];
     } catch (e) {
-      print('Error de red: $e');
+      print('Error al obtener mediciones: $e');
       return [];
     }
   }
@@ -199,6 +195,52 @@ class ApiService {
     } catch (e) {
       print('Error al resolver alerta: $e');
       return false;
+    }
+  }
+
+  // REPORTAR FALLA (CLIENTE -> ADMIN)
+  Future<bool> reportarFalla(String motivo, String detalle) async {
+    try {
+      final token = await _getToken();
+      if (token == null) return false;
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/reportar-falla/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'motivo': motivo,
+          'detalle': detalle,
+        }),
+      );
+
+      return response.statusCode == 201;
+    } catch (e) {
+      print('Error al reportar falla: $e');
+      return false;
+    }
+  }
+
+  // OBTENER PLANTACIONES ASIGNADAS AL USUARIO
+  Future<List<dynamic>> getMisCultivos() async {
+    try {
+      final token = await _getToken();
+      if (token == null) return [];
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/mis-cultivos/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return [];
+    } catch (e) {
+      print('Error al cargar cultivos: $e');
+      return [];
     }
   }
 }

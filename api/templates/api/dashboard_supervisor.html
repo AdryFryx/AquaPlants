@@ -61,6 +61,9 @@
                                     <button class="btn btn-sm btn-success fw-bold w-100" data-bs-toggle="modal" data-bs-target="#modalResolver{{ informe.id }}">
                                         <i class="bi bi-check-circle"></i> Resolver Ticket
                                     </button>
+                                    <a href="{% url 'detalle_dispositivo_web' informe.dispositivo.id %}" class="btn btn-sm btn-outline-success fw-bold">
+                                        <i class="bi bi-graph-up-arrow"></i> Ver Gráficas en Vivo
+                                    </a>
 
                                     <!-- Modal de Feedback -->
                                     <div class="modal fade" id="modalResolver{{ informe.id }}" tabindex="-1">

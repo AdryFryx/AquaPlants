@@ -30,13 +30,141 @@ class _AlertasScreenState extends State<AlertasScreen> {
   }
 
   Future<void> _marcarComoLeida(int id, int index) async {
-    // Actualizamos la pantalla de inmediato (Optimistic UI)
     setState(() {
       _alertas.removeAt(index);
     });
-    
-    // Le avisamos a Django que borre la alerta
     await _apiService.resolverAlerta(id);
+  }
+
+  void _mostrarModalReporteFalla() {
+    String motivoSeleccionado = 'Bomba no funciona';
+    final TextEditingController detalleController = TextEditingController();
+    bool enviando = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // Evita que el teclado tape el campo de texto
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Reportar Falla del Dispositivo',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFD32F2F)),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Selecciona el problema que estás presentando:',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 12),
+
+                  RadioListTile<String>(
+                    title: const Text('Bomba no funciona'),
+                    value: 'Bomba no funciona',
+                    groupValue: motivoSeleccionado,
+                    activeColor: const Color(0xFFD32F2F),
+                    onChanged: (val) => setModalState(() => motivoSeleccionado = val!),
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('Sin Conexión'),
+                    value: 'Sin Conexión',
+                    groupValue: motivoSeleccionado,
+                    activeColor: const Color(0xFFD32F2F),
+                    onChanged: (val) => setModalState(() => motivoSeleccionado = val!),
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('Otro'),
+                    value: 'Otro',
+                    groupValue: motivoSeleccionado,
+                    activeColor: const Color(0xFFD32F2F),
+                    onChanged: (val) => setModalState(() => motivoSeleccionado = val!),
+                  ),
+
+                  // Cuadro de texto condicional solo si elige "Otro"
+                  if (motivoSeleccionado == 'Otro') ...[
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: detalleController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: 'Describe qué está fallando o pasando',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD32F2F),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: enviando
+                          ? null
+                          : () async {
+                              if (motivoSeleccionado == 'Otro' && detalleController.text.trim().isEmpty) {
+                                ScaffoldMessenger.of(this.context).showSnackBar(
+                                  const SnackBar(content: Text('Por favor describe el problema.')),
+                                );
+                                return;
+                              }
+
+                              setModalState(() => enviando = true);
+                              final exito = await _apiService.reportarFalla(
+                                motivoSeleccionado,
+                                detalleController.text.trim(),
+                              );
+
+                              if (!mounted) return;
+                              Navigator.pop(modalContext);
+
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    exito
+                                        ? 'Reporte enviado al administrador.'
+                                        : 'No se pudo enviar el reporte. Intenta nuevamente.',
+                                  ),
+                                  backgroundColor: exito ? Colors.green : Colors.red,
+                                ),
+                              );
+                            },
+                      child: enviando
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Enviar Reporte',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -48,6 +176,12 @@ class _AlertasScreenState extends State<AlertasScreen> {
         backgroundColor: const Color(0xFFD32F2F),
         elevation: 0,
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _mostrarModalReporteFalla,
+        backgroundColor: const Color(0xFFD32F2F),
+        icon: const Icon(Icons.build_circle_outlined, color: Colors.white),
+        label: const Text('Reportar Falla', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _alertas.isEmpty
@@ -55,7 +189,7 @@ class _AlertasScreenState extends State<AlertasScreen> {
                   child: Text('Todo tranquilo. No hay alertas.', style: TextStyle(fontSize: 16, color: Colors.grey)),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
                   itemCount: _alertas.length,
                   itemBuilder: (context, index) {
                     final alerta = _alertas[index];
