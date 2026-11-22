@@ -18,8 +18,11 @@
                 <img src="{% static 'img/logo.png' %}" alt="Logo AquaPlants" height="35" class="me-2 rounded">
                 Panel de {{ rol }}
             </a>
-            <div class="d-flex text-white align-items-center">
-                <span class="me-3"><i class="bi bi-person-circle"></i> {{ request.user.username }}</span>
+            <div class="d-flex text-white align-items-center gap-2">
+                <span class="me-2"><i class="bi bi-person-circle"></i> {{ request.user.username }}</span>
+                <a href="{% url 'informe_gestion_web' %}" class="btn btn-sm btn-outline-light">
+                    <i class="bi bi-file-earmark-bar-graph"></i> Informe de Gestión
+                </a>
                 <a href="{% url 'logout_web' %}" class="btn btn-sm btn-outline-light">Cerrar Sesión</a>
             </div>
         </div>

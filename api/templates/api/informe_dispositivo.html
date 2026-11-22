@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe Técnico - {{ disp.nombre_instalacion }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f4f6f9; }
+        .kpi-card { border-left: 4px solid #00BFA5; }
+        @media print {
+            .no-print { display: none !important; }
+            body { background-color: #ffffff !important; }
+            .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+        }
+    </style>
+</head>
+<body class="py-4">
+    <div class="container">
+        <!-- Barra de acciones -->
+        <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+            <a href="{% url 'detalle_dispositivo_web' disp.id %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Volver a la Torre
+            </a>
+            <button onclick="window.print()" class="btn btn-success fw-bold">
+                <i class="bi bi-printer"></i> Imprimir / Guardar PDF
+            </button>
+        </div>
+
+        <!-- Encabezado -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <h2 class="fw-bold text-success mb-1">
+                        <i class="bi bi-file-earmark-text"></i> Informe de Gestión por Dispositivo
+                    </h2>
+                    <p class="text-muted mb-0">
+                        <strong>Torre:</strong> {{ disp.nombre_instalacion }} (<code>{{ disp.mac_address }}</code>) ·
+                        <strong>Cliente:</strong> {{ cliente.get_full_name|default:cliente.username }} ({{ cliente.email|default:"Sin correo" }})
+                    </p>
+                </div>
+                <div class="text-end small text-muted">
+                    <div><strong>Fecha de emisión:</strong> {{ fecha_generacion|date:"d/m/Y H:i" }}</div>
+                    <div><strong>Emitido por:</strong> {{ generado_por.get_full_name|default:generado_por.username }}</div>
+                    <div class="mt-1">
+                        {% if disp.estado_conexion %}
+                            <span class="badge bg-success">Torre En Línea</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Torre Desconectada</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPIs del Dispositivo -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3 col-6">
+                <div class="card shadow-sm border-0 kpi-card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Plantaciones Activas</div>
+                        <div class="fs-2 fw-bold text-success">{{ cultivos|length }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card shadow-sm border-0 kpi-card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Lecturas Registradas</div>
+                        <div class="fs-2 fw-bold text-primary">{{ total_mediciones }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card shadow-sm border-0 kpi-card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Alertas Activas</div>
+                        <div class="fs-2 fw-bold text-danger">{{ total_alertas }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card shadow-sm border-0 kpi-card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Tickets de Falla</div>
+                        <div class="fs-2 fw-bold text-dark">{{ fallas_resueltas }} / {{ total_fallas }}</div>
+                        <div class="small text-muted">resueltos</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Promedios + Plantaciones -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-5">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white fw-bold text-success">
+                        <i class="bi bi-thermometer-half"></i> Promedios Históricos de la Torre
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                <tr><td>Temperatura promedio</td><td class="text-end fw-bold">{{ promedios.temp|floatformat:1|default:"--" }} °C</td></tr>
+                                <tr><td>Nivel de agua promedio</td><td class="text-end fw-bold">{{ promedios.agua|floatformat:1|default:"--" }} %</td></tr>
+                                <tr><td>Nivel de pH promedio</td><td class="text-end fw-bold">{{ promedios.ph|floatformat:2|default:"--" }}</td></tr>
+                                <tr><td>Nutriente A promedio</td><td class="text-end fw-bold">{{ promedios.nut_a|floatformat:2|default:"--" }} ml/L</td></tr>
+                                <tr><td>Nutriente B promedio</td><td class="text-end fw-bold">{{ promedios.nut_b|floatformat:2|default:"--" }} ml/L</td></tr>
+                            </tbody>
+                        </table>
+                        {% if ultima_medicion %}
+                            <div class="small text-muted border-top mt-3 pt-2">
+                                Última lectura: {{ ultima_medicion.timestamp|date:"d/m/Y H:i:s" }}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-7">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white fw-bold text-success">
+                        <i class="bi bi-flower1"></i> Plantaciones y Umbrales Configurados
+                    </div>
+                    <div class="card-body">
+                        {% for c in cultivos %}
+                            <div class="mb-3 pb-2 border-bottom">
+                                <div class="fw-bold text-dark">{{ c.tipo_planta }} <span class="text-muted fw-normal small">({{ c.semanas_ciclo }} semanas)</span></div>
+                                <div class="d-flex flex-wrap gap-2 mt-1">
+                                    {% for r in c.reglas.all %}
+                                        <span class="badge bg-light text-dark border">
+                                            {{ r.get_variable_display }}: {{ r.rango_minimo }} – {{ r.rango_maximo }}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% empty %}
+                            <p class="text-muted mb-0">Esta torre no tiene plantaciones asignadas.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Últimas Alertas -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white fw-bold text-danger">
+                <i class="bi bi-exclamation-triangle"></i> Últimas Alertas Registradas
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    {% for alerta in alertas %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>{{ alerta.mensaje }}</span>
+                            <small class="text-muted text-nowrap ms-3">{{ alerta.medicion.timestamp|date:"d/m/Y H:i" }}</small>
+                        </li>
+                    {% empty %}
+                        <li class="list-group-item text-muted">No hay alertas pendientes para esta torre.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Historial de Fallas -->
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white fw-bold text-success">
+                <i class="bi bi-tools"></i> Historial de Incidencias y Soporte
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Descripción</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for f in fallas %}
+                                <tr>
+                                    <td class="text-nowrap">{{ f.fecha_creacion|date:"d/m/Y H:i" }}</td>
+                                    <td>{{ f.descripcion|default:f.reporte_cliente }}</td>
+                                    <td><span class="badge bg-secondary">{{ f.estado }}</span></td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="3" class="text-center text-muted py-3">Sin incidencias registradas.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

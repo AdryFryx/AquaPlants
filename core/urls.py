@@ -64,4 +64,6 @@ urlpatterns = [
     path('crear-informe/', views.crear_informe_falla, name='crear_informe'),
     path('asignar-reporte/', views.asignar_reporte_cliente, name='asignar_reporte_cliente'),
     path('resolver-informe/', views.resolver_informe, name='resolver_informe'),
+    path('informe-gestion/', views.informe_gestion_web, name='informe_gestion_web'),
+    path('dispositivo/<int:dispositivo_id>/informe/', views.informe_dispositivo_web, name='informe_dispositivo_web'),
 ]

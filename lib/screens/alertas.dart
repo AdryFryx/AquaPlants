@@ -168,6 +168,7 @@ class _AlertasScreenState extends State<AlertasScreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -175,6 +176,12 @@ class _AlertasScreenState extends State<AlertasScreen> {
         title: const Text('Centro de Alertas', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFFD32F2F),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _cargarAlertas,
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _mostrarModalReporteFalla,
@@ -184,34 +191,44 @@ class _AlertasScreenState extends State<AlertasScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _alertas.isEmpty
-              ? const Center(
-                  child: Text('Todo tranquilo. No hay alertas.', style: TextStyle(fontSize: 16, color: Colors.grey)),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
-                  itemCount: _alertas.length,
-                  itemBuilder: (context, index) {
-                    final alerta = _alertas[index];
-                    return Card(
-                      elevation: 2,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(16),
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.red[50],
-                          child: const Icon(Icons.warning_amber_rounded, color: Colors.red),
+          : RefreshIndicator(
+              onRefresh: _cargarAlertas,
+              child: _alertas.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 250),
+                        Center(
+                          child: Text('Todo tranquilo. No hay alertas.', style: TextStyle(fontSize: 16, color: Colors.grey)),
                         ),
-                        title: Text(alerta['mensaje'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.check_circle_outline, color: Colors.green, size: 30),
-                          onPressed: () => _marcarComoLeida(alerta['id'], index),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                      ],
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
+                      itemCount: _alertas.length,
+                      itemBuilder: (context, index) {
+                        final alerta = _alertas[index];
+                        return Card(
+                          elevation: 2,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.all(16),
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.red[50],
+                              child: const Icon(Icons.warning_amber_rounded, color: Colors.red),
+                            ),
+                            title: Text(alerta['mensaje'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.check_circle_outline, color: Colors.green, size: 30),
+                              onPressed: () => _marcarComoLeida(alerta['id'], index),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
     );
   }
 }

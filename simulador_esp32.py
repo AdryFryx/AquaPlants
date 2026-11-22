@@ -3,7 +3,7 @@ import random
 import time
 
 # Usa esta URL https://aquaplants.onrender.com/datos-esp32/ para producción en Render (o cambia a http://127.0.0.1:8000/datos-esp32/ para pruebas locales)
-API_URL = "http://127.0.0.1:8000/datos-esp32/"
+API_URL = "https://aquaplants.onrender.com/datos-esp32/"
 
 # Solo cambias esta MAC por la de cualquier torre registrada en tu panel Admin
 MAC_ADDRESS = "00:11:22:33:44:55"
@@ -49,4 +49,4 @@ while True:
         print("❌ Error de red transitorio.")
 
     # Esperar 5 minutos (300 segundos) para el siguiente envío
-    time.sleep(300)
+    time.sleep(10)

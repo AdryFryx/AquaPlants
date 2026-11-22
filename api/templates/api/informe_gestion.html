@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe de Gestión - AquaPlants</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f4f6f9; }
+        .kpi-card { border-left: 4px solid #00BFA5; }
+        @media print {
+            .no-print { display: none !important; }
+            body { background-color: #ffffff !important; }
+            .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+        }
+    </style>
+</head>
+<body class="py-4">
+    <div class="container">
+        <!-- Barra de acciones (se oculta al imprimir) -->
+        <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+            <a href="{% url 'dashboard_admin' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Volver al Panel
+            </a>
+            <button onclick="window.print()" class="btn btn-success fw-bold">
+                <i class="bi bi-printer"></i> Imprimir / Guardar PDF
+            </button>
+        </div>
+
+        <!-- Encabezado oficial del informe -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <h2 class="fw-bold text-success mb-1">
+                        <i class="bi bi-file-earmark-bar-graph"></i> Informe de Gestión Operativa
+                    </h2>
+                    <p class="text-muted mb-0">Sistema de Monitoreo Hidropónico IoT — AquaPlants</p>
+                </div>
+                <div class="text-end small text-muted">
+                    <div><strong>Fecha de emisión:</strong> {{ fecha_generacion|date:"d/m/Y H:i" }}</div>
+                    <div><strong>Emitido por:</strong> {{ generado_por.get_full_name|default:generado_por.username }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 1. KPIs Principales -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3 col-6">
+                <div class="card shadow-sm border-0 kpi-card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Clientes Registrados</div>
+                        <div class="fs-2 fw-bold text-dark">{{ total_clientes }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card shadow-sm border-0 kpi-card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Torres Activas</div>
+                        <div class="fs-2 fw-bold text-success">{{ dispositivos_online }} / {{ total_dispositivos }}</div>
+                        <div class="small text-muted">{{ dispositivos_offline }} desconectadas</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card shadow-sm border-0 kpi-card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Lecturas IoT / Alertas</div>
+                        <div class="fs-2 fw-bold text-primary">{{ total_mediciones }}</div>
+                        <div class="small text-danger">{{ total_alertas }} alertas activas</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card shadow-sm border-0 kpi-card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Resolución de Fallas</div>
+                        <div class="fs-2 fw-bold text-success">{{ tasa_resolucion }}%</div>
+                        <div class="small text-muted">{{ fallas_resueltas }} de {{ total_fallas }} tickets</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Promedios de Sensores + Gestión de Tickets -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white fw-bold text-success">
+                        <i class="bi bi-thermometer-half"></i> Promedios Globales de Sensores
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                <tr><td>Temperatura promedio</td><td class="text-end fw-bold">{{ promedios.temp|floatformat:1|default:"--" }} °C</td></tr>
+                                <tr><td>Nivel de agua promedio</td><td class="text-end fw-bold">{{ promedios.agua|floatformat:1|default:"--" }} %</td></tr>
+                                <tr><td>Nivel de pH promedio</td><td class="text-end fw-bold">{{ promedios.ph|floatformat:2|default:"--" }}</td></tr>
+                                <tr><td>Nutriente A promedio</td><td class="text-end fw-bold">{{ promedios.nut_a|floatformat:2|default:"--" }} ml/L</td></tr>
+                                <tr><td>Nutriente B promedio</td><td class="text-end fw-bold">{{ promedios.nut_b|floatformat:2|default:"--" }} ml/L</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white fw-bold text-success">
+                        <i class="bi bi-flower1"></i> Distribución de Plantaciones ({{ total_cultivos }} activas)
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm mb-3">
+                            <tbody>
+                                {% for item in cultivos_por_tipo %}
+                                    <tr>
+                                        <td>{{ item.tipo_planta }}</td>
+                                        <td class="text-end fw-bold">{{ item.total }} torre(s)</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr><td colspan="2" class="text-muted">Sin plantaciones registradas.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <div class="small text-muted border-top pt-2">
+                            <strong>Estado de tickets de soporte:</strong>
+                            {{ fallas_por_asignar }} por asignar · {{ fallas_pendientes }} pendientes · {{ fallas_resueltas }} resueltos.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Detalle por Dispositivo -->
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white fw-bold text-success">
+                <i class="bi bi-cpu"></i> Resumen por Torre Hidropónica
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Instalación</th>
+                                <th>MAC</th>
+                                <th>Cliente</th>
+                                <th>Plantaciones</th>
+                                <th>Lecturas</th>
+                                <th>Estado</th>
+                                <th>Informe Individual</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in dispositivos_detalle %}
+                            <tr>
+                                <td class="fw-bold">{{ d.nombre_instalacion }}</td>
+                                <td><code>{{ d.mac_address }}</code></td>
+                                <td>{{ d.usuario_encargado.get_full_name|default:d.usuario_encargado.username }}</td>
+                                <td>
+                                    {% for c in d.cultivos.all %}
+                                        <span class="badge bg-success-subtle text-success border border-success">{{ c.tipo_planta }}</span>
+                                    {% empty %}
+                                        <span class="text-muted small">Sin asignar</span>
+                                    {% endfor %}
+                                </td>
+                                <td>{{ d.num_mediciones }}</td>
+                                <td>
+                                    {% if d.estado_conexion %}
+                                        <span class="badge bg-success">En línea</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Desconectado</span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-bold">
+                                    <a href="{% url 'informe_dispositivo_web' d.id %}" class="text-decoration-none text-success">
+                                        <i class="bi bi-file-earmark-bar-graph"></i>{{ d.nombre_instalacion }}
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="6" class="text-center text-muted py-3">No hay dispositivos registrados.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

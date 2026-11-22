@@ -288,11 +288,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         setState(() => _graficoActual = index);
                       },
                       children: [
-                        _buildChart('Temperatura (°C)', historialTemp, Colors.orange),
-                        _buildChart('Nivel de Agua (%)', historialAgua, Colors.blue),
-                        _buildChart('Nivel de pH', historialPh, Colors.purple),
-                        _buildChart('Nutriente A (ml/L)', historialNutA, Colors.teal),
-                        _buildChart('Nutriente B (ml/L)', historialNutB, Colors.deepPurple),
+                        _buildChart('Temperatura (°C)', historialTemp, Colors.orange, 'TEMP'),
+                        _buildChart('Nivel de Agua (%)', historialAgua, Colors.blue, 'AGUA'),
+                        _buildChart('Nivel de pH', historialPh, Colors.purple, 'PH'),
+                        _buildChart('Nutriente A (ml/L)', historialNutA, Colors.teal, 'NUT_A'),
+                        _buildChart('Nutriente B (ml/L)', historialNutB, Colors.deepPurple, 'NUT_B'),
                       ],
                     ),
                   ),
@@ -344,14 +344,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildChart(String titulo, List<FlSpot> datos, Color color) {
+  Widget _buildChart(String titulo, List<FlSpot> datos, Color color, String claveRegla) {
     if (datos.isEmpty) {
       return const Center(child: Text('Sin mediciones para esta torre', style: TextStyle(color: Colors.grey)));
     }
+
+    final reglas = _cultivoSeleccionado?['reglas'] as Map<String, dynamic>?;
+    final regla = reglas?[claveRegla];
+    final double? minIdeal = regla != null ? (regla['minimo'] as num).toDouble() : null;
+    final double? maxIdeal = regla != null ? (regla['maximo'] as num).toDouble() : null;
+
     return Column(
       children: [
         Text(titulo, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 16)),
-        const SizedBox(height: 16),
+        if (minIdeal != null && maxIdeal != null)
+          Text(
+            'Zona ideal: $minIdeal – $maxIdeal',
+            style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        const SizedBox(height: 12),
         Expanded(
           child: LineChart(
             LineChartData(
@@ -361,6 +372,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
               ),
               borderData: FlBorderData(show: false),
+              // Banda verde suave de fondo para el rango ideal
+              rangeAnnotations: RangeAnnotations(
+                horizontalRangeAnnotations: (minIdeal != null && maxIdeal != null)
+                    ? [
+                        HorizontalRangeAnnotation(
+                          y1: minIdeal,
+                          y2: maxIdeal,
+                          color: Colors.green.withValues(alpha: 0.12),
+                        ),
+                      ]
+                    : [],
+              ),
+              // Líneas punteadas de mínimo y máximo
+              extraLinesData: ExtraLinesData(
+                horizontalLines: (minIdeal != null && maxIdeal != null)
+                    ? [
+                        HorizontalLine(
+                          y: minIdeal,
+                          color: Colors.green.withValues(alpha: 0.6),
+                          strokeWidth: 1.5,
+                          dashArray: [6, 4],
+                        ),
+                        HorizontalLine(
+                          y: maxIdeal,
+                          color: Colors.red.withValues(alpha: 0.6),
+                          strokeWidth: 1.5,
+                          dashArray: [6, 4],
+                        ),
+                      ]
+                    : [],
+              ),
               lineBarsData: [
                 LineChartBarData(
                   spots: datos,
@@ -368,7 +410,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: color,
                   barWidth: 4,
                   isStrokeCapRound: true,
-                  belowBarData: BarAreaData(show: true, color: color.withValues(alpha: 0.2)),
+                  belowBarData: BarAreaData(show: true, color: color.withValues(alpha: 0.15)),
                 ),
               ],
             ),

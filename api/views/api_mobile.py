@@ -53,28 +53,29 @@ class MedicionViewSet(viewsets.ModelViewSet):
             return queryset.order_by('-timestamp')[:20]
 
         return queryset.order_by('-timestamp')
-
+    
     def perform_create(self, serializer):
         medicion = serializer.save()
         try:
-            cultivo = medicion.dispositivo.cultivo_activo
+            cultivos = medicion.dispositivo.cultivos.filter(activo=True).prefetch_related('reglas')
             variables = {
                 'TEMP': ('temperatura', 'Temperatura', '°C'),
                 'PH': ('ph', 'pH', ''),
-                'AGUA': ('nivel_agua', 'Nivel de agua', ''),
+                'AGUA': ('nivel_agua', 'Nivel de agua', '%'),
+                'NUT_A': ('nutriente_a', 'Nutriente A', ' ml/L'),
+                'NUT_B': ('nutriente_b', 'Nutriente B', ' ml/L'),
             }
-            for variable, datos in variables.items():
-                campo, nombre, unidad = datos
-                valor = getattr(medicion, campo)
-                if valor is None:
-                    continue
-
-                regla = cultivo.reglas.filter(variable=variable).first()
-                if regla and (valor < regla.rango_minimo or valor > regla.rango_maximo):
-                    AlertaGenerada.objects.create(
-                        medicion=medicion,
-                        mensaje=f'ALERTA: {nombre} fuera del rango permitido. Valor: {valor}{unidad}. Rango: {regla.rango_minimo}-{regla.rango_maximo}{unidad}.'
-                    )
+            for cultivo in cultivos:
+                for variable, (campo, nombre, unidad) in variables.items():
+                    valor = getattr(medicion, campo)
+                    if valor is None:
+                        continue
+                    regla = cultivo.reglas.filter(variable=variable).first()
+                    if regla and (valor < regla.rango_minimo or valor > regla.rango_maximo):
+                        AlertaGenerada.objects.create(
+                            medicion=medicion,
+                            mensaje=f'ALERTA ({cultivo.tipo_planta}): {nombre} fuera de rango ({valor}{unidad}). Ideal: {regla.rango_minimo}-{regla.rango_maximo}{unidad}.'
+                        )
         except Exception as e:
             print(f'Error en el motor de alertas: {e}')
 

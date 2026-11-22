@@ -5,8 +5,10 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User, Group
 from django.contrib import messages
 from django.views.decorators.http import require_POST
+from django.db.models import Count, Avg
+from django.utils import timezone
 
-from ..models import Dispositivo, Medicion, InformeFalla, Cultivo
+from ..models import Dispositivo, Medicion, InformeFalla, Cultivo, AlertaGenerada
 from ..permissions import es_administrador, es_supervisor
 from .web_supervisor import render_dashboard_supervisor
 from .presets import PLANTACIONES_PRESETS, aplicar_preset_a_cultivo
@@ -361,3 +363,119 @@ def eliminar_cultivo_web(request):
 
     messages.success(request, f"Plantación de {nombre} eliminada.")
     return redirect(request.META.get('HTTP_REFERER', 'dashboard_admin'))
+
+@login_required(login_url='login_web')
+def informe_gestion_web(request):
+    """Genera el Informe de Gestión ejecutivo del sistema."""
+    if not es_administrador(request.user):
+        return redirect('dashboard_admin')
+
+    # KPIs de infraestructura y usuarios
+    total_clientes = User.objects.filter(groups__name='CLIENTE').count()
+    total_dispositivos = Dispositivo.objects.count()
+    dispositivos_online = Dispositivo.objects.filter(estado_conexion=True).count()
+    dispositivos_offline = total_dispositivos - dispositivos_online
+
+    # Distribución de plantaciones activas
+    cultivos_por_tipo = (
+        Cultivo.objects.filter(activo=True)
+        .values('tipo_planta')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+    total_cultivos = Cultivo.objects.filter(activo=True).count()
+
+    # Promedios globales de sensores y alertas
+    total_mediciones = Medicion.objects.count()
+    promedios = Medicion.objects.aggregate(
+        temp=Avg('temperatura'),
+        agua=Avg('nivel_agua'),
+        ph=Avg('ph'),
+        nut_a=Avg('nutriente_a'),
+        nut_b=Avg('nutriente_b'),
+    )
+    total_alertas = AlertaGenerada.objects.count()
+
+    # Gestión de incidencias / fallas
+    total_fallas = InformeFalla.objects.count()
+    fallas_por_asignar = InformeFalla.objects.filter(estado='POR_ASIGNAR').count()
+    fallas_pendientes = InformeFalla.objects.filter(estado='PENDIENTE').count()
+    fallas_resueltas = InformeFalla.objects.filter(estado='RESUELTO').count()
+    tasa_resolucion = round((fallas_resueltas / total_fallas) * 100, 1) if total_fallas > 0 else 100.0
+
+    # Detalle por torre
+    dispositivos_detalle = (
+        Dispositivo.objects.select_related('usuario_encargado')
+        .prefetch_related('cultivos')
+        .annotate(num_mediciones=Count('mediciones', distinct=True))
+    )
+
+    contexto = {
+        'fecha_generacion': timezone.now(),
+        'generado_por': request.user,
+        'total_clientes': total_clientes,
+        'total_dispositivos': total_dispositivos,
+        'dispositivos_online': dispositivos_online,
+        'dispositivos_offline': dispositivos_offline,
+        'total_cultivos': total_cultivos,
+        'cultivos_por_tipo': cultivos_por_tipo,
+        'total_mediciones': total_mediciones,
+        'promedios': promedios,
+        'total_alertas': total_alertas,
+        'total_fallas': total_fallas,
+        'fallas_por_asignar': fallas_por_asignar,
+        'fallas_pendientes': fallas_pendientes,
+        'fallas_resueltas': fallas_resueltas,
+        'tasa_resolucion': tasa_resolucion,
+        'dispositivos_detalle': dispositivos_detalle,
+    }
+    return render(request, 'api/informe_gestion.html', contexto)
+
+@login_required(login_url='login_web')
+def informe_dispositivo_web(request, dispositivo_id):
+    """Genera un Informe de Gestión individual para una torre y su cliente."""
+    if not (es_administrador(request.user) or es_supervisor(request.user)):
+        return redirect('dashboard_admin')
+
+    dispositivo = get_object_or_404(
+        Dispositivo.objects.select_related('usuario_encargado')
+        .prefetch_related('cultivos__reglas'),
+        id=dispositivo_id
+    )
+
+    mediciones_qs = Medicion.objects.filter(dispositivo=dispositivo)
+    total_mediciones = mediciones_qs.count()
+    promedios = mediciones_qs.aggregate(
+        temp=Avg('temperatura'),
+        agua=Avg('nivel_agua'),
+        ph=Avg('ph'),
+        nut_a=Avg('nutriente_a'),
+        nut_b=Avg('nutriente_b'),
+    )
+    ultima_medicion = mediciones_qs.order_by('-timestamp').first()
+
+    alertas = AlertaGenerada.objects.filter(
+        medicion__dispositivo=dispositivo
+    ).select_related('medicion').order_by('-id')[:10]
+    total_alertas = AlertaGenerada.objects.filter(medicion__dispositivo=dispositivo).count()
+
+    fallas = InformeFalla.objects.filter(dispositivo=dispositivo).order_by('-fecha_creacion')
+    total_fallas = fallas.count()
+    fallas_resueltas = fallas.filter(estado='RESUELTO').count()
+
+    contexto = {
+        'fecha_generacion': timezone.now(),
+        'generado_por': request.user,
+        'disp': dispositivo,
+        'cliente': dispositivo.usuario_encargado,
+        'cultivos': dispositivo.cultivos.filter(activo=True),
+        'total_mediciones': total_mediciones,
+        'promedios': promedios,
+        'ultima_medicion': ultima_medicion,
+        'alertas': alertas,
+        'total_alertas': total_alertas,
+        'fallas': fallas,
+        'total_fallas': total_fallas,
+        'fallas_resueltas': fallas_resueltas,
+    }
+    return render(request, 'api/informe_dispositivo.html', contexto)

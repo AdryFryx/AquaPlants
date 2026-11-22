@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  final String baseUrl = 'http://127.0.0.1:8000/api'; //nube (https://aquaplants.onrender.com/api) || local(http://127.0.0.1:8000/api)
+  final String baseUrl = 'https://aquaplants.onrender.com/api'; //nube (https://aquaplants.onrender.com/api) || local(http://127.0.0.1:8000/api)
 
   // Obtener token JWT
   Future<String?> _getToken() async {

@@ -25,4 +25,6 @@ from .web_admin import (
     eliminar_dispositivo_web,
     agregar_cultivo_web,
     eliminar_cultivo_web,
+    informe_gestion_web,
+    informe_dispositivo_web,
 )
