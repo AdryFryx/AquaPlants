@@ -214,7 +214,7 @@ class _AnaliticaScreenState extends State<AnaliticaScreen> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _cultivos.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
                     final cultivo = _cultivos[index];
                     final seleccionado = _cultivoSeleccionado?['id'] == cultivo['id'];

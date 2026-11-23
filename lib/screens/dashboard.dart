@@ -176,7 +176,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _cultivos.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
                     final cultivo = _cultivos[index];
                     final seleccionado = _cultivoSeleccionado?['id'] == cultivo['id'];
@@ -211,7 +211,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                   child: _buildMetricCard(
                     'Temp.',
-                    _tempVal != null ? '${_tempVal}°C' : '--',
+                    _tempVal != null ? '$_tempVal°C' : '--',
                     _rangoTexto('TEMP', '°C'),
                     _colorSegunRegla('TEMP', _tempVal, Colors.orange),
                     Icons.thermostat,
@@ -221,7 +221,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                   child: _buildMetricCard(
                     'Agua',
-                    _aguaVal != null ? '${_aguaVal}%' : '--',
+                    _aguaVal != null ? '$_aguaVal%' : '--',
                     _rangoTexto('AGUA', '%'),
                     _colorSegunRegla('AGUA', _aguaVal, Colors.blue),
                     Icons.water_drop,
