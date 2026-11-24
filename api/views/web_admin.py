@@ -331,9 +331,15 @@ def agregar_cultivo_web(request):
         return redirect('dashboard_admin')
 
     dispositivo_id = request.POST.get('dispositivo_id')
-    tipo_planta = request.POST.get('tipo_planta')
+    tipo_planta = (request.POST.get('tipo_planta') or '').strip()
 
-    if tipo_planta not in PLANTACIONES_PRESETS:
+    especie_base = tipo_planta
+    if tipo_planta.startswith('Lechuga'):
+        especie_base = 'Lechuga'
+    elif tipo_planta.startswith('Acelga'):
+        especie_base = 'Acelga'
+
+    if especie_base not in PLANTACIONES_PRESETS:
         messages.error(request, "Tipo de plantación no válido.")
         return redirect(request.META.get('HTTP_REFERER', 'dashboard_admin'))
 
