@@ -99,7 +99,7 @@ PLANTACIONES_PRESETS = {
             'NUT_B': (2.0, 3.0),
         },
     },
-    'Tomate': {
+    'Tomate-Cherry': {
         'semanas_ciclo': 12,
         'reglas': {
             'TEMP': (20.0, 26.0),
